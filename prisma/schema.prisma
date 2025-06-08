@@ -8,35 +8,39 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  clerkId   String   @unique // Clerk user ID
+  id        String    @id @default(uuid())
+  clerkId   String    @unique // Clerk user ID
   name      String
-  email     String   @unique
+  email     String    @unique
   gigs      Gig[]
   contacts  Contact[]
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  Task      Task[]
 }
 
 model Gig {
-  id        String     @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   userId    String
-  user      User       @relation(fields: [userId], references: [id])
-  contacts  Contact[]  @relation("GigContacts")
+  user      User      @relation(fields: [userId], references: [id])
+  contacts  Contact[] @relation("GigContacts")
   deals     Deal[]
-  createdAt DateTime   @default(now())
+  createdAt DateTime  @default(now())
+  Task      Task[]
 }
 
 model Contact {
-  id        String     @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
   email     String?
   phone     String?
   userId    String
-  user      User       @relation(fields: [userId], references: [id])
-  gigs      Gig[]      @relation("GigContacts")
-  tags      Tag[]      @relation("ContactTags")
-  createdAt DateTime   @default(now())
+  status    LeadStatus   @default(NEW) 
+  user      User     @relation(fields: [userId], references: [id])
+  gigs      Gig[]    @relation("GigContacts")
+  tags      Tag[]    @relation("ContactTags")
+  createdAt DateTime @default(now())
+  Task      Task[]
 }
 
 model Deal {
@@ -47,12 +51,43 @@ model Deal {
   gigId     String
   gig       Gig        @relation(fields: [gigId], references: [id])
   createdAt DateTime   @default(now())
+  Task      Task[]
 }
 
 model Tag {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  contacts  Contact[]  @relation("ContactTags")
+  id       String    @id @default(uuid())
+  name     String    @unique
+  contacts Contact[] @relation("ContactTags")
+}
+
+model Task {
+  id      String     @id @default(uuid())
+  title   String
+  notes   String?
+  dueDate DateTime?
+  status  TaskStatus @default(PENDING)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  contactId String? // optional
+  contact   Contact? @relation(fields: [contactId], references: [id])
+
+  gigId String? // optional
+  gig   Gig?    @relation(fields: [gigId], references: [id])
+
+  dealId String? // optional
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  CANCELLED
 }
 
 enum DealStatus {
@@ -60,4 +95,14 @@ enum DealStatus {
   WON
   LOST
   CANCELLED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  LOST
+  CONVERTED
+  HOT
+  COLD
 }

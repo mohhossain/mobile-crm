@@ -5,7 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET() {
+
+  
+
   const { userId } = await auth();
+
+  console.log("User ID from auth:", userId);
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

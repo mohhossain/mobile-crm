@@ -10,13 +10,17 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.20.2",
+    "@heroicons/react": "^2.2.0",
     "@prisma/client": "^6.9.0",
     "@prisma/extension-accelerate": "^2.0.1",
     "@radix-ui/themes": "^3.2.1",
+    "cloudinary": "^2.6.1",
     "next": "15.3.3",
+    "next-cloudinary": "^6.16.0",
     "prisma": "^6.9.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-tag-input": "^6.10.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
