@@ -35,6 +35,8 @@ model Contact {
   email     String?
   phone     String?
   userId    String
+  // image url is optional
+  imageUrl  String?
   status    LeadStatus   @default(NEW) 
   user      User     @relation(fields: [userId], references: [id])
   gigs      Gig[]    @relation("GigContacts")

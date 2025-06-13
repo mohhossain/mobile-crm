@@ -14,7 +14,7 @@ const AddLeads = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("NEW"); // default status is NEW
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,16 +23,43 @@ const AddLeads = () => {
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
 
   const router = useRouter();
 
   // image upload handler
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    
     const file = e.target.files?.[0];
     if (file) {
       setImage(file);
       setImagePreview(URL.createObjectURL(file));
+      
+      // upload image to server
+      const formData = new FormData();
+      formData.append("image", file);
+
+      try {
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to upload image");
+        }
+
+        const data = await response.json();
+        setImageUrl(data.url); // assuming the server returns the image URL
+        console.log("Image uploaded successfully:", data.url);
+        
+      } catch (err) {
+        console.error("Image upload error:", err);
+        setError("Failed to upload image");
+      }
     }
+
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,38 +68,16 @@ const AddLeads = () => {
     setError(null);
     setSuccess(false);
 
-    // upload image to cloudinary
-    if (image) {
-      const formData = new FormData();
-      formData.append("image", image);
-
-      try {
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error("Image upload failed");
-        }
-
-        const uploadResult = await uploadResponse.json();
-        // Assuming the response contains the URL of the uploaded image
-        setImagePreview(uploadResult.secure_url);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-        setLoading(false);
-        return;
-      }
-    }
-
     try {
+
+      console.log("Submitting lead:", { name, email, phone, status, tags });
+
       const response = await fetch("/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, email, phone, status, tags }),
+        body: JSON.stringify({ name, email, phone, status, tags, imageUrl }),
       });
 
       if (!response.ok) {
@@ -85,6 +90,8 @@ const AddLeads = () => {
       setPhone("");
       setStatus("");
       setTags([]);
+      setImage(null);
+      setImagePreview(null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -96,20 +103,22 @@ const AddLeads = () => {
   };
 
   return (
+
+    // make the form center of the page 
     
-    <form onSubmit={handleSubmit} className="space-y-8 divide-y divide-gray-200">
+    <form onSubmit={handleSubmit} className="space-y-20 divide-y divide-gray-200 max-w-5xl mx-auto p-2 justify-center space-x-10">
       {error && ( 
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error:</strong>
           <span className="block sm:inline"> {error}</span>
         </div>
       )}
-      <div className="space-y-12">
+      <div className="space-y-8 container mx-auto">
         <div className="border-b border-gray-900/10 pb-12">
           <h2 className="text-base/7 font-semibold text-gray-900">Setup client profile</h2>
 
-          <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-            <div className="sm:col-span-4">
+          <div className=" mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <div className="sm:col-span-8">
               <label htmlFor="username" className="block text-sm/6 font-medium text-gray-900">
                 Name
               </label>
@@ -117,6 +126,8 @@ const AddLeads = () => {
                 <div className="flex items-center rounded-md bg-white pl-3 outline-1 -outline-offset-1 outline-gray-300 focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-indigo-600">
                   
                   <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     id="username"
                     name="username"
                     type="text"
@@ -127,13 +138,15 @@ const AddLeads = () => {
               </div>
             </div>
 
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-8">
               <label htmlFor="email" className="block text-sm/6 font-medium text-gray-900">
                 Email
               </label>
               <div className="mt-2">
                 <input
                   id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   name="email"
                   type="email"
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm/6 sm:leading-6"
@@ -143,13 +156,15 @@ const AddLeads = () => {
               </div>
             </div>
 
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-8">
               <label htmlFor="phone" className="block text-sm/6 font-medium text-gray-900">
                 Phone
               </label>
               <div className="mt-2">
                 <input
                   id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   name="phone"
                   type="tel"
                   placeholder="+1 (555) 123-4567"
@@ -158,7 +173,7 @@ const AddLeads = () => {
               </div>
             </div>
 
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-8">
               <label htmlFor="status" className="block text-sm/6 font-medium text-gray-900">
                 Status
               </label>
@@ -167,7 +182,7 @@ const AddLeads = () => {
                   id="status"
                   name="status"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatus(e.target.value)}
                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm/6 sm:leading-6"
                 >
                   

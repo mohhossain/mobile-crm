@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const { name, email, phone, tags, status = "NEW" } = body;
+        const { name, email, phone, tags, imageUrl, status = "NEW" } = body;
 
         // Create or find tags
         const tagIds = await Promise.all(
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
                 email,
                 phone,
                 status,
+                imageUrl,
                 userId: user.id, // Use the user's ID from the database
                 tags: {
                     connect: tagIds.map((id) => ({ id })),
