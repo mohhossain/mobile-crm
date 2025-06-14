@@ -103,5 +103,41 @@ export async function POST(request: Request) {
     }
 }
 
+// make a delete request to delete a contact by id received in the request body
+
+export async function DELETE(request: Request) {
+    const { userId } = await auth();
+    if (!userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // find the user in the database where userId is the clerkId
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+    });
+
+    if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    try {
+        const body = await request.json();
+        const { id } = body;
+
+        // Delete the contact
+        await prisma.contact.delete({
+            where: {
+                id,
+                userId: user.id, // Ensure the contact belongs to the user
+            },
+        });
+
+        return NextResponse.json({ message: "Contact deleted successfully" });
+
+    } catch (err) {
+        console.error("Error deleting contact:", err);
+        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    }
+}
 
 

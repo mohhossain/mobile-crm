@@ -1,5 +1,9 @@
+"use client";
+
 import React from "react";
-import Image from "next/image";
+import { TrashIcon } from "@heroicons/react/24/solid";
+import { useRouter } from "next/navigation";
+import { ToastContainer, toast, Bounce } from "react-toastify";
 
 interface Contact {
   id: string;
@@ -16,46 +20,145 @@ interface ContactProps {
 }
 
 export default function ContactCard({ contact }: ContactProps) {
-  const isHotLead = contact.tags.includes("Hot Lead");
+  const router = useRouter();
 
+  const notifySuccess = (message: string) => {
+    toast(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: false,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "dark",
+      transition: Bounce,
+    });
+  };
+
+  const notifyError = (message: string) => {
+    toast.error(message, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: false,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "dark",
+      transition: Bounce,
+    });
+  }
+
+  // handle the delete action
+
+  const handleDelete = async () => {
+    try {
+      const response = await fetch(`/api/leads`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: contact.id }),
+      });
+
+      if (response.ok) {
+        notifySuccess(`Contact ${contact.name} deleted successfully!`);
+        router.refresh();
+      }
+      else {
+        notifyError("Failed to delete contact");
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to delete contact");
+      }
+
+      // Redirect or update the UI after deletion
+       // This will refresh the current page to reflect the deletion
+
+      // Optionally, you can refresh the contacts list or show a success message
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+    }
+  };
+
+  // background color base content from daisyUI
   return (
-    <div className="rounded-2xl p-5 bg-[#0e0e11] text-white w-[280px] h-[190px] flex flex-col justify-between shadow-lg border border-[#2c2c32] relative">
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-[#1f1f24]">
-          <Image
-            src={contact.imageUrl || "/default-avatar.png"}
-            alt={contact.name}
-            width={56}
-            height={56}
-            className="object-cover"
-          />
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <h3 className="text-sm font-bold text-white truncate">
-            {contact.name}
-          </h3>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide truncate">
-            {contact.status}
-          </p>
-        </div>
+    <div className={`card bg-base-100 w-96 shadow-sm`}>
+      {/* add a delete icon button */}
+
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+        transition={Bounce}
+      />
+
+      <div className="card-actions justify-end">
+        <button
+          onClick={() =>
+            // log the contact object
+            (console.log("Deleting contact:", contact.name),
+            document.getElementById(
+              `modal-${contact.id}`
+            ) as HTMLDialogElement | null)?.showModal()
+          }
+          className="btn btn-ghost btn-sm"
+        >
+          <TrashIcon className="h-5 w-5 text-gray-500 hover:text-red-500" />
+        </button>
+        <dialog id={`modal-${contact.id}`} className="modal">
+          <div className="modal-box bg-warning text-warning-content">
+            <h3 className="font-bold text-lg">Delete Confirmation</h3>
+            <p className="py-4">
+              Are you sure you want to delete{" "}
+              <span className="text-error-content">{contact.name}</span>?
+            </p>
+            <form method="dialog" className="modal-action">
+              <button onClick={handleDelete} className="btn btn-error">
+                Yes
+              </button>
+              <button className="btn btn-primary">No</button>
+            </form>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button>close</button>
+          </form>
+        </dialog>
       </div>
 
-      {isHotLead && (
-        <div className="absolute top-3 right-3 text-[10px] font-semibold uppercase bg-orange-600 text-white px-2 py-0.5 rounded-full shadow">
-          🔥 Hot Lead
-        </div>
-      )}
-
-      <div className="mt-4">
-        <p className="text-xs text-gray-400 mb-1">Source</p>
-        <div className="flex gap-2">
-          <span className="bg-white text-black text-xs px-2 py-0.5 rounded-full font-semibold shadow">
-            LinkedIn
-          </span>
-          <span className="bg-white text-black text-xs px-2 py-0.5 rounded-full font-semibold shadow">
-            Dribbble
-          </span>
-        </div>
+      <div className="card-body max-w">
+        {contact.imageUrl ? (
+          <div className="avatar">
+            <div className="w-16 rounded-full">
+              <img
+                src={contact.imageUrl}
+                alt={contact.name}
+                className="w-full h-full object-cover rounded-full"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="avatar avatar-placeholder">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-base-200">
+              <span className="text-gray-500 text-lg">
+                {contact.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
+        )}
+        <h2 className="card-title">{contact.name}</h2>
+        <p className="text-sm text-gray-500">{contact.email}</p>
+        <p className="text-sm text-gray-500">{contact.phone}</p>
+        <p className="text-sm text-primary"> {contact.status}</p>
       </div>
     </div>
   );

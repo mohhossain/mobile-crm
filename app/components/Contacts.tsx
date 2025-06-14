@@ -17,8 +17,7 @@ export default async function Contacts() {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-4 flex-wrap">
-                
+            <div className="flex m-3 p-2 gap-4 overflow-x-auto hide-scrollbar no-scrollbar">
                 {contacts.map((contact) => (
                     <Contact key={contact.id} contact={contact} /> 
                 ))}
