@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react";
 
 import { useRouter } from "next/navigation";
-import { UserCircleIcon } from '@heroicons/react/24/solid'
-
-
-
-
+import InputTags from "./InputTags";
 //  make a POST request to the server to add a contact, with status dropdown, area input for tags hashtag and enter will make a tag visually
 
 const AddLeads = () => {
@@ -15,7 +11,7 @@ const AddLeads = () => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState("NEW"); // default status is NEW
-  const [tags, setTags] = useState([]);
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -25,17 +21,15 @@ const AddLeads = () => {
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-
   const router = useRouter();
 
   // image upload handler
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    
     const file = e.target.files?.[0];
     if (file) {
       setImage(file);
       setImagePreview(URL.createObjectURL(file));
-      
+
       // upload image to server
       const formData = new FormData();
       formData.append("image", file);
@@ -53,13 +47,11 @@ const AddLeads = () => {
         const data = await response.json();
         setImageUrl(data.url); // assuming the server returns the image URL
         console.log("Image uploaded successfully:", data.url);
-        
       } catch (err) {
         console.error("Image upload error:", err);
         setError("Failed to upload image");
       }
     }
-
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,7 +61,6 @@ const AddLeads = () => {
     setSuccess(false);
 
     try {
-
       console.log("Submitting lead:", { name, email, phone, status, tags });
 
       const response = await fetch("/api/leads", {
@@ -88,7 +79,7 @@ const AddLeads = () => {
       setName("");
       setEmail("");
       setPhone("");
-      setStatus("");
+      setStatus("NEW");
       setTags([]);
       setImage(null);
       setImagePreview(null);
@@ -103,32 +94,94 @@ const AddLeads = () => {
   };
 
   return (
+    // make the form center of the page
 
-    // make the form center of the page 
-    
-    // daisyUI 
-    <form className="max-w-md mx-auto p-6 rounded-lg shadow-md space-y-4"
+    // daisyUI
+    <form
+      className="max-w-md mx-auto p-6 rounded-lg shadow-md space-y-4"
       onSubmit={handleSubmit}
-    > 
+    >
       <h2 className="text-2xl font-bold text-center mb-4">Add New Lead</h2>
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      {success && <p className="text-green-500 text-sm">Lead added successfully!</p>}
-      <div className="form-control">
-        <label className="label">
-          <span className="label-text">Name</span>
-        </label>
+      {success && (
+        <p className="text-green-500 text-sm">Lead added successfully!</p>
+      )}
+      <div className="form-control space-y-4 justify-center items-center text-center w-full">
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          placeholder="Name"
           required
-          className="input input-bordered w-full"
+          className="input"
         />
+
+        <input
+          className="input validator"
+          type="email"
+          placeholder="mail@site.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input
+          className="input validator"
+          type="tel"
+          placeholder="123-456-7890"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+        <select
+          className="select select-bordered"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
+            <option value="NEW">New</option>
+            <option value="CONTACTED">Contacted</option>
+            <option value="QUALIFIED">Qualified</option>
+            <option value="LOST">Lost</option>
+            <option value="CONVERTED">Converted</option>
+            <option value="HOT">Hot</option>
+            <option value="COLD">Cold</option>
+        </select>
+
+        
+        <div className="flex flex-col items-center w-full">
+          <fieldset className="fieldset">
+          <legend className="fieldset-legend text-left">Pick a profile picture</legend>
+          <input type="file" className="file-input" 
+          accept="image/*"
+          onChange={handleImageChange}
+          />
+          <label className="label">Max size 10MB</label>
+        </fieldset>
+        </div>
+
+        <div className="flex flex-col text-center w-full items-center ">
+          <InputTags
+            tags={tags}
+            onTagsInput={(inputTags) => {
+              setTags(inputTags);
+            }}
+          />
+        </div>
+
+        
+
+        <button
+          type="submit"
+          className={`btn btn-primary ${loading ? "loading" : ""} w-78`}
+          disabled={loading}
+        >
+          {loading ? "Adding Lead..." : "Add Lead"}
+        </button>
+
+
       </div>
-      </form>
-  )
-}
 
 
+        
+    </form>
+  );
+};
 
 export default AddLeads;

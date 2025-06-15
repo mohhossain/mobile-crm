@@ -3,15 +3,15 @@
 import React from "react";
 import { TrashIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
-import { ToastContainer, toast, Bounce } from "react-toastify";
+import { toast, Bounce } from "react-toastify";
 
 interface Contact {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
   status: string;
-  imageUrl: string;
+  imageUrl: string | null;
   tags: string[];
 }
 
@@ -24,8 +24,9 @@ export default function ContactCard({ contact }: ContactProps) {
 
   const notifySuccess = (message: string) => {
     toast(message, {
+      toastId: `success-${contact.id}`,
       position: "top-right",
-      autoClose: 5000,
+      autoClose: 1000,
       hideProgressBar: false,
       closeOnClick: false,
       pauseOnHover: true,
@@ -38,8 +39,9 @@ export default function ContactCard({ contact }: ContactProps) {
 
   const notifyError = (message: string) => {
     toast.error(message, {
+      toastId: `error-${contact.id}`,
       position: "top-right",
-      autoClose: 5000,
+      autoClose: 1000,
       hideProgressBar: false,
       closeOnClick: false,
       pauseOnHover: true,
@@ -64,7 +66,7 @@ export default function ContactCard({ contact }: ContactProps) {
 
       if (response.ok) {
         notifySuccess(`Contact ${contact.name} deleted successfully!`);
-        router.refresh();
+        router.refresh() // Delay to allow the toast to show
       }
       else {
         notifyError("Failed to delete contact");
@@ -85,22 +87,8 @@ export default function ContactCard({ contact }: ContactProps) {
 
   // background color base content from daisyUI
   return (
-    <div className={`card bg-base-100 w-96 shadow-sm`}>
+    <div className={`card bg-base-100 min-w-70 shadow-sm`}>
       {/* add a delete icon button */}
-
-      <ToastContainer
-        position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick={false}
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-        transition={Bounce}
-      />
 
       <div className="card-actions justify-end">
         <button
@@ -135,13 +123,13 @@ export default function ContactCard({ contact }: ContactProps) {
         </dialog>
       </div>
 
-      <div className="card-body max-w">
+      <div className="card-body max-w w-full">
         {contact.imageUrl ? (
           <div className="avatar">
             <div className="w-16 rounded-full">
               <img
                 src={contact.imageUrl}
-                alt={contact.name}
+                alt={contact.name ?? undefined}
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
@@ -150,7 +138,7 @@ export default function ContactCard({ contact }: ContactProps) {
           <div className="avatar avatar-placeholder">
             <div className="w-16 h-16 rounded-full flex items-center justify-center bg-base-200">
               <span className="text-gray-500 text-lg">
-                {contact.name.charAt(0).toUpperCase()}
+                {(contact.name?.charAt(0)?.toUpperCase() ?? "")}
               </span>
             </div>
           </div>
@@ -158,6 +146,16 @@ export default function ContactCard({ contact }: ContactProps) {
         <h2 className="card-title">{contact.name}</h2>
         <p className="text-sm text-gray-500">{contact.email}</p>
         <p className="text-sm text-gray-500">{contact.phone}</p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {contact.tags.map((tag) => (
+            <span
+              key={tag}
+              className="badge badge-primary badge-outline text-xs"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
         <p className="text-sm text-primary"> {contact.status}</p>
       </div>
     </div>

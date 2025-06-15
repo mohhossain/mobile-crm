@@ -16,6 +16,8 @@ model User {
   contacts  Contact[]
   createdAt DateTime  @default(now())
   Task      Task[]
+  deals     Deal[]
+  updatedAt DateTime @updatedAt @default(now())
 }
 
 model Gig {
@@ -27,6 +29,8 @@ model Gig {
   deals     Deal[]
   createdAt DateTime  @default(now())
   Task      Task[]
+  updatedAt DateTime  @updatedAt
+  description String?
 }
 
 model Contact {
@@ -43,6 +47,8 @@ model Contact {
   tags      Tag[]    @relation("ContactTags")
   createdAt DateTime @default(now())
   Task      Task[]
+  updatedAt DateTime @updatedAt @default(now())
+  deals     Deal[]   @relation("ContactDeals")
 }
 
 model Deal {
@@ -54,12 +60,22 @@ model Deal {
   gig       Gig        @relation(fields: [gigId], references: [id])
   createdAt DateTime   @default(now())
   Task      Task[]
+  updatedAt DateTime @updatedAt @default(now())
+  contacts Contact[] @relation("ContactDeals")
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  tags     Tag[]    @relation("TagDeals")
 }
 
 model Tag {
   id       String    @id @default(uuid())
   name     String    @unique
   contacts Contact[] @relation("ContactTags")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+
+
+  deals    Deal[]   @relation("TagDeals")
 }
 
 model Task {
