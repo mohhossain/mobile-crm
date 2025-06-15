@@ -56,8 +56,8 @@ model Deal {
   title     String
   amount    Float
   status    DealStatus
-  gigId     String
-  gig       Gig        @relation(fields: [gigId], references: [id])
+  gigId     String?
+  gig       Gig?        @relation(fields: [gigId], references: [id])
   createdAt DateTime   @default(now())
   Task      Task[]
   updatedAt DateTime @updatedAt @default(now())

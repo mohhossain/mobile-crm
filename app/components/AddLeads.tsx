@@ -1,36 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import InputTags from "./InputTags";
-//  make a POST request to the server to add a contact, with status dropdown, area input for tags hashtag and enter will make a tag visually
 
-const AddLeads = () => {
+interface AddLeadsProps {
+  onSuccess?: (contact: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    status: string;
+  }) => void;
+}
+
+const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState("NEW"); // default status is NEW
+  const [status, setStatus] = useState("NEW");
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  // image upload state
+
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const router = useRouter();
 
-  // image upload handler
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImage(file);
       setImagePreview(URL.createObjectURL(file));
 
-      // upload image to server
       const formData = new FormData();
       formData.append("image", file);
 
@@ -40,12 +45,10 @@ const AddLeads = () => {
           body: formData,
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to upload image");
-        }
+        if (!response.ok) throw new Error("Failed to upload image");
 
         const data = await response.json();
-        setImageUrl(data.url); // assuming the server returns the image URL
+        setImageUrl(data.url);
         console.log("Image uploaded successfully:", data.url);
       } catch (err) {
         console.error("Image upload error:", err);
@@ -61,19 +64,15 @@ const AddLeads = () => {
     setSuccess(false);
 
     try {
-      console.log("Submitting lead:", { name, email, phone, status, tags });
-
       const response = await fetch("/api/leads", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, phone, status, tags, imageUrl }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to add lead");
-      }
+      if (!response.ok) throw new Error("Failed to add lead");
+
+      const data = await response.json();
 
       setSuccess(true);
       setName("");
@@ -83,20 +82,20 @@ const AddLeads = () => {
       setTags([]);
       setImage(null);
       setImagePreview(null);
+      setImageUrl(null);
+
+      // optional callback for parent component
+      onSuccess?.(data.contact);
+
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      // do a refresh of the page to show the new lead
-      router.refresh();
       setLoading(false);
     }
   };
 
   return (
-    // make the form center of the page
-
-    // daisyUI
     <form
       className="max-w-md mx-auto p-6 rounded-lg shadow-md space-y-4"
       onSubmit={handleSubmit}
@@ -135,37 +134,33 @@ const AddLeads = () => {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-            <option value="NEW">New</option>
-            <option value="CONTACTED">Contacted</option>
-            <option value="QUALIFIED">Qualified</option>
-            <option value="LOST">Lost</option>
-            <option value="CONVERTED">Converted</option>
-            <option value="HOT">Hot</option>
-            <option value="COLD">Cold</option>
+          <option value="NEW">New</option>
+          <option value="CONTACTED">Contacted</option>
+          <option value="QUALIFIED">Qualified</option>
+          <option value="LOST">Lost</option>
+          <option value="CONVERTED">Converted</option>
+          <option value="HOT">Hot</option>
+          <option value="COLD">Cold</option>
         </select>
 
-        
         <div className="flex flex-col items-center w-full">
           <fieldset className="fieldset">
-          <legend className="fieldset-legend text-left">Pick a profile picture</legend>
-          <input type="file" className="file-input" 
-          accept="image/*"
-          onChange={handleImageChange}
-          />
-          <label className="label">Max size 10MB</label>
-        </fieldset>
+            <legend className="fieldset-legend text-left">
+              Pick a profile picture
+            </legend>
+            <input
+              type="file"
+              className="file-input"
+              accept="image/*"
+              onChange={handleImageChange}
+            />
+            <label className="label">Max size 10MB</label>
+          </fieldset>
         </div>
 
         <div className="flex flex-col text-center w-full items-center ">
-          <InputTags
-            tags={tags}
-            onTagsInput={(inputTags) => {
-              setTags(inputTags);
-            }}
-          />
+          <InputTags tags={tags} onTagsInput={setTags} />
         </div>
-
-        
 
         <button
           type="submit"
@@ -174,12 +169,7 @@ const AddLeads = () => {
         >
           {loading ? "Adding Lead..." : "Add Lead"}
         </button>
-
-
       </div>
-
-
-        
     </form>
   );
 };
