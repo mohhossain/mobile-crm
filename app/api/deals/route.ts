@@ -18,6 +18,7 @@ export async function GET() {
             where: { userId: user.id }, // Use the user's ID from the database
             include: {
                 tags: true, // Include tags related to the deal
+                contacts: true, // Include contacts related to the deal
             },
         });
 

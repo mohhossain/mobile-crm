@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import Dock from "./components/Dock";
+
 import "./globals.css";
 import {
   ClerkProvider,
@@ -39,6 +41,7 @@ export default function RootLayout({
               <SyncUser />
             </SignedIn>
             {children}
+            <Dock />
         </body>
       </html>
     </ClerkProvider>
