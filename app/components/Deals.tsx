@@ -12,11 +12,14 @@ const Deals = async () => {
         include: {
             tags: true, // Include tags related to the deal
             contacts: true, // Include contacts related to the deal
+            notes: true
         },
         orderBy: {
             createdAt: 'desc', // Order by creation date, most recent first
         },
     });
+
+    console.log("Fetched deals:", deals); // Debugging log to check fetched deals
   return (
     <div className="flex flex-col m-3 p-2 gap-4 overflow-x-auto hide-scrollbar no-scrollbar">
         {deals.map((deal) => ( 

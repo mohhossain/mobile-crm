@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Listbox, Transition } from "@headlessui/react";
-import {
-  CheckCircleIcon,
-  ChevronUpDownIcon,
-} from "@heroicons/react/24/outline";
+
+
 import InputTags from "./InputTags";
 import AddLeads from "./AddLeads";
 import ContactMultiSelect from "./ContactMultiSelect";
+
+import AddNotes from "./AddNotes";
+
+
 
 interface Contact {
   id: string;
@@ -18,18 +19,24 @@ interface Contact {
 }
 
 const AddDeals = () => {
+
+
+
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState("OPEN");
+  const [status, setStatus] = useState("PENDING"); // Default status
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
 
   const [contactOptions, setContactOptions] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
 
+  const [notes, setNotes] = useState<string[]>([]);
+ 
   const router = useRouter();
 
   useEffect(() => {
@@ -64,7 +71,9 @@ const AddDeals = () => {
           amount: parseFloat(amount),
           status,
           tags,
+          closeDate: dueDate ? dueDate.toISOString() : null,
           contactIds: selectedContacts.map((c) => c.id),
+          notes
         }),
       });
 
@@ -76,6 +85,8 @@ const AddDeals = () => {
       setStatus("OPEN");
       setTags([]);
       setSelectedContacts([]);
+      setDueDate(null);
+      setNotes([]);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -121,7 +132,6 @@ const AddDeals = () => {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="Amount"
-            required
             className="input"
           />
 
@@ -130,39 +140,61 @@ const AddDeals = () => {
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
-            <option value="OPEN">Open</option>
+            <option value="PENDING">Pending</option>
             <option value="WON">Won</option>
             <option value="LOST">Lost</option>
             <option value="NEGOTIATION">Negotiation</option>
-            <option value="PENDING">Pending</option>
           </select>
+
+          <div className="due-date w-full">
+            <label className="label">
+              <span className="label-text">Due Date</span>
+            </label>
+            <input type="datetime-local" className="input" 
+            
+            onChange={(e) => {
+              const date = e.target.value ? new Date(e.target.value) : null;
+              setDueDate(date);
+            }}
+            
+            placeholder="Select Due Date"
+            />
+          </div>
 
           {/* CONTACT MULTISELECT */}
           <div className="flex flex-col text-center w-full items-center ">
-          <ContactMultiSelect
-            contacts={contactOptions}
-            selected={selectedContacts}
-            onChange={(newSelected) =>
-              setSelectedContacts(newSelected)
-            }
-          />
+            <ContactMultiSelect
+              contacts={contactOptions}
+              selected={selectedContacts}
+              onChange={(newSelected) => setSelectedContacts(newSelected)}
+            />
 
-          <button
-            type="button"
-            className="btn btn-outline btn-sm mt-2"
-            onClick={() => setShowAddContactModal(true)}
-          >
-            + Add New Contact
-          </button>
-        <InputTags tags={tags} onTagsInput={setTags} />
-        <button
-          type="submit"
-          className={`btn btn-primary ${loading ? "loading" : ""} w-78`}
-          disabled={loading}
-        >
-          {loading ? "Adding Deal..." : "Add Deal"}
-        </button>
-        </div>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm mt-2"
+              onClick={() => setShowAddContactModal(true)}
+            >
+              + Add New Contact
+            </button>
+            <AddNotes
+            notes={notes}
+            onNotesInput={(notes: string[]) => {
+              // Handle notes input if needed
+              setNotes(notes);
+              console.log("Notes added:", notes);
+            }}
+          />
+            <InputTags tags={tags} onTagsInput={setTags} />
+            <button
+              type="submit"
+              className={`btn btn-primary ${loading ? "loading" : ""} w-78`}
+              disabled={loading}
+            >
+              {loading ? "Adding Deal..." : "Add Deal"}
+            </button>
+          </div>
+
+          
         </div>
 
         {/* TAGS */}

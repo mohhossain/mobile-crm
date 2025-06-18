@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import Dock from "./components/Dock";
-
 import "./globals.css";
 import {
   ClerkProvider,
@@ -12,6 +11,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import SyncUser from "./components/SyncUser";
+import ThemeProvider from "./components/ThemeProvider";
 
 
 export const metadata: Metadata = {
@@ -24,10 +24,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+
   return (
     <ClerkProvider>
-      <html lang="en" data-theme="halloween">
+      <html lang="en" data-theme="light">
         <body className="bg-base-300 text-base-content min-h-screen">
+              <ThemeProvider>
             <header className="flex justify-end items-center p-4 gap-4 h-16">
               <SignedOut>
                 <SignInButton />
@@ -40,8 +43,9 @@ export default function RootLayout({
             <SignedIn>
               <SyncUser />
             </SignedIn>
-            {children}
+             {children}
             <Dock />
+             </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

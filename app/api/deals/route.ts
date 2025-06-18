@@ -19,6 +19,11 @@ export async function GET() {
             include: {
                 tags: true, // Include tags related to the deal
                 contacts: true, // Include contacts related to the deal
+                notes: {
+                    include: {
+                        user: true, // Include user who created the note
+                    },
+                },
             },
         });
 
@@ -30,41 +35,54 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const user = await getCurrentUser();
+  const user = await getCurrentUser();
 
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    const body = await request.json();
-    const { title, amount, tags, status, contactIds } = body;
+  const body = await request.json();
+  const { title, amount, tags, status, contactIds, closeDate, notes } = body;
 
-    try {
-        // Create a new deal for the user
-        const deal = await prisma.deal.create({
-            data: {
-                title,
-                amount,
-                status: status || "PENDING", // Default status is NEW if not provided
-                userId: user.id, // Use the user's ID from the database
-                tags: {
-                    connectOrCreate: tags.map((tag: string) => ({
-                        where: { name: tag },
-                        create: { name: tag },
-                    })),
-                },
-                contacts: {
-                    connect: contactIds.map((id: string) => ({ id })),
-                },
-            
-            },
-        });
+  // Defensive defaults
+  const safeTags = Array.isArray(tags) ? tags : [];
+  const safeContactIds = Array.isArray(contactIds) ? contactIds : [];
+  const safeNotes = Array.isArray(notes) ? notes.filter(n => typeof n === "string" && n.trim() !== "") : [];
 
-        return NextResponse.json(deal);
-    } catch (err) {
-        console.error("Error creating deal:", err);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
-    }
+  // Validate amount - convert to number or null
+  const parsedAmount = typeof amount === "number" && !isNaN(amount) ? amount : null;
+
+  try {
+    const deal = await prisma.deal.create({
+      data: {
+        title,
+        amount: parsedAmount ?? 0,
+        status: status || "PENDING",
+        userId: user.id,
+        closeDate: closeDate ? new Date(closeDate) : null,
+        tags: safeTags.length > 0 ? {
+          connectOrCreate: safeTags.map((tag: string) => ({
+            where: { name: tag },
+            create: { name: tag },
+          })),
+        } : undefined,
+        contacts: safeContactIds.length > 0 ? {
+          connect: safeContactIds.map((id: string) => ({ id })),
+        } : undefined,
+        notes: safeNotes.length > 0 ? {
+          create: safeNotes.map((note: string) => ({
+            content: note,
+            userId: user.id,
+          })),
+        } : undefined,
+      },
+    });
+
+    return NextResponse.json(deal);
+  } catch (err) {
+    console.error("Error creating deal:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
