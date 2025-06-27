@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { content } = body;
+    const { content, dealId  } = body;
 
     try {
         // Create a new note for the user
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
             data: {
                 content,
                 userId: user.id, // Use the user's ID from the database
+                dealId, // Optional: associate the note with a deal if provided
             },
         });
 
@@ -49,28 +50,18 @@ export async function POST(request: Request) {
     }
 }
 
-export async function DELETE(request: Request) {
-    const user = await getCurrentUser();
+export async function DELETE(req: Request) {
 
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const body = await req.json();
+    
 
-    const body = await request.json();
-    const { id } = body;
+  try {
+    await prisma.note.delete({
+      where: { id: body.id },
+    })
 
-    try {
-        // Delete the note for the user
-        const note = await prisma.note.delete({
-            where: {
-                id,
-                userId: user.id, // Ensure the note belongs to the user
-            },
-        });
-
-        return NextResponse.json(note);
-    } catch (err) {
-        console.error("Error deleting note:", err);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
-    }
-}   
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 })
+  }
+} 

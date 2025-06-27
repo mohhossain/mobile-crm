@@ -95,14 +95,6 @@ const AddDeals = () => {
     }
   };
 
-  // Helper: toggle contact in selection
-  const toggleContact = (contact: Contact) => {
-    if (selectedContacts.some((c) => c.id === contact.id)) {
-      setSelectedContacts(selectedContacts.filter((c) => c.id !== contact.id));
-    } else {
-      setSelectedContacts([...selectedContacts, contact]);
-    }
-  };
 
   return (
     <>

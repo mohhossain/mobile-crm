@@ -12,6 +12,8 @@ interface AddLeadsProps {
     phone: string;
     status: string;
   }) => void;
+
+  onCancel?: () => void;
 }
 
 const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess }) => {

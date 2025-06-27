@@ -64,7 +64,7 @@ model Deal {
   gigId     String?
   gig       Gig?        @relation(fields: [gigId], references: [id])
   createdAt DateTime   @default(now())
-  Task      Task[]
+  tasks      Task[]
   updatedAt DateTime @updatedAt @default(now())
   contacts Contact[] @relation("ContactDeals")
   userId   String

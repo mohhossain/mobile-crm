@@ -47,7 +47,7 @@ const Dock = () => {
                 points="1 11 12 2 23 11"
                 fill="none"
                 stroke="currentColor"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></polyline>
               <path
@@ -55,7 +55,7 @@ const Dock = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeLinecap="square"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></path>
               <line
@@ -66,7 +66,7 @@ const Dock = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeLinecap="square"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></line>
             </g>
@@ -84,7 +84,7 @@ const Dock = () => {
                 points="3 14 9 14 9 17 15 17 15 14 21 14"
                 fill="none"
                 stroke="currentColor"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></polyline>
               <rect
@@ -97,7 +97,7 @@ const Dock = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeLinecap="square"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></rect>
             </g>
@@ -118,7 +118,7 @@ const Dock = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeLinecap="square"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></circle>
               <path
@@ -126,7 +126,7 @@ const Dock = () => {
                 fill="none"
                 stroke="currentColor"
                 strokeLinecap="square"
-                stroke-miterlimit="10"
+                strokeMiterlimit="10"
                 strokeWidth="2"
               ></path>
             </g>
