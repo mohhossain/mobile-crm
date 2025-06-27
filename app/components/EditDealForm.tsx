@@ -127,7 +127,6 @@ export default function EditDealForm({
         className="max-w-md mx-auto space-y-4 p-4 bg-base-200 rounded-lg shadow"
         onSubmit={handleSubmit}
       >
-        <h2 className="text-xl font-semibold">Edit Deal</h2>
 
         {error && <p className="text-red-500">{error}</p>}
         {success && (
