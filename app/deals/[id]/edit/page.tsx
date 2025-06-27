@@ -4,12 +4,19 @@ import EditDealForm from "@/app/components/EditDealForm";
 
 
 
-export default async function EditDealPage({ params }: { params: { id: string } }) {
+
+
+export default async function EditDealPage() {
+
+  const params = new URLSearchParams(window.location.search);
+  const dealId = params.get("id");
+
   const user = await getCurrentUser();
   if (!user) return <div>Unauthorized</div>;
+  if (!dealId) return <div>Invalid deal ID</div>;
 
   const deal = await prisma.deal.findUnique({
-    where: { id: params.id, userId: user.id },
+    where: { id: dealId, userId: user.id },
     include: { contacts: true },
   });
 
@@ -28,12 +35,7 @@ export default async function EditDealPage({ params }: { params: { id: string } 
             ? new Date(deal.closeDate).toISOString().slice(0, 10)
             : ""
         }
-        initialContacts={
-          (deal.contacts ?? []).map(contact => ({
-            ...contact,
-            email: contact.email ?? ""
-          }))
-        }
+        initialContacts={deal.contacts ? deal.contacts.map((c) => ({ id: c.id, name: c.name || "", email: c.email || "", phone: c.phone || "" })) : []}
       />
     </div>
   );

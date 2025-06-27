@@ -17,7 +17,8 @@ interface DealEditFormProps {
   initialAmount: number;
   initialStatus: string;
   initialCloseDate: string | null; // ISO date string or null
-  initialContacts: Contact[];
+  initialContacts: Contact[]; 
+
 }
 
 const STATUS_OPTIONS = ["OPEN", "WON", "LOST", "NEGOTIATION", "PENDING"];
