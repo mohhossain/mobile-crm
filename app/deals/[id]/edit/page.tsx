@@ -2,11 +2,9 @@ import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import EditDealForm from "@/app/components/EditDealForm";
 
-interface EditPageProps {
-  params: { id: string };
-}
 
-export default async function EditDealPage({ params }: EditPageProps) {
+
+export default async function EditDealPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) return <div>Unauthorized</div>;
 
