@@ -7,12 +7,12 @@ import DeleteDealButton from '@/app/components/DeleteDealButton'
 import Link from 'next/link'
 
 interface DealPageProps {
-  params: Promise<{ id?: string }>
+  tparams: Promise<{ id: string }>
 }
 
-const Page = async ({ params }: DealPageProps) => {
+const Page = async ({ tparams }: DealPageProps) => {
   const user = await getCurrentUser()
-  const {id} = await params;
+  const {id} = await tparams;
 
   if (!user) {
     return <div className="p-4 text-center text-gray-500">Unauthorized.</div>
