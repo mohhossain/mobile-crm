@@ -7,14 +7,11 @@ import DeleteDealButton from '@/app/components/DeleteDealButton'
 import Link from 'next/link'
 
 interface DealPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{ id?: string }>
 }
 
 const Page = async ({ params }: DealPageProps) => {
   const user = await getCurrentUser()
-
   const {id} = await params;
 
   if (!user) {

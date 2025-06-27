@@ -123,6 +123,12 @@ export default function EditDealForm({
 
   return (
     <>
+      <button
+        className="btn btn-sm btn-outline mb-4 "
+        onClick={() => router.back()}
+      >
+        Back to Deal
+      </button>
       <form
         className="max-w-md mx-auto space-y-4 p-4 bg-base-200 rounded-lg shadow"
         onSubmit={handleSubmit}
