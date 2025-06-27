@@ -3,19 +3,18 @@
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import EditDealForm from "@/app/components/EditDealForm";
-import { useParams } from "next/navigation";
 
 
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id?: string }>;
 }
 
 export default async function EditDealPage({ params }: PageProps) {
 
   // Get the deal ID from the URL parameters using nexturl
  
-  const dealId = params?.id as string | undefined;
+  const { id: dealId } = await params;
 
   const user = await getCurrentUser();
   if (!user) return <div>Unauthorized</div>;
