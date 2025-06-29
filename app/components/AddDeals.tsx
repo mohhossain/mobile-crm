@@ -19,9 +19,6 @@ interface Contact {
 }
 
 const AddDeals = () => {
-
-
-
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState("PENDING"); // Default status

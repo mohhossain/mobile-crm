@@ -50,7 +50,7 @@ model Contact {
   gigs      Gig[]    @relation("GigContacts")
   tags      Tag[]    @relation("ContactTags")
   createdAt DateTime @default(now())
-  Task      Task[]
+  tasks      Task[]
   updatedAt DateTime @updatedAt @default(now())
   deals     Deal[]   @relation("ContactDeals")
   notes     Note[] // optional, if the contact has notes
@@ -113,14 +113,18 @@ model Tag {
 model Task {
   id      String     @id @default(uuid())
   title   String
+
+  description String?
+  priority Int @default(1) // 1 is low, 2 is medium, 3 is high
+  startDate DateTime? // optional, when the task starts
   dueDate DateTime?
-  status  TaskStatus @default(PENDING)
+
+  status  TaskStatus @default(TO_DO)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  contactId String? // optional
-  contact   Contact? @relation(fields: [contactId], references: [id])
+  contacts Contact[] 
 
   gigId String? // optional
   gig   Gig?    @relation(fields: [gigId], references: [id])
@@ -134,7 +138,7 @@ model Task {
 }
 
 enum TaskStatus {
-  PENDING
+  TO_DO
   IN_PROGRESS
   DONE
   CANCELLED
