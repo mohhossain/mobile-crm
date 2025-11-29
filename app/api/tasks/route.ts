@@ -1,11 +1,6 @@
-// File: app/api/tasks/route.ts
-
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/currentUser';
 import { NextResponse } from 'next/server';
-
-
-
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -40,17 +35,23 @@ export async function POST(req: Request) {
   const { title, description, priority, startDate, dueDate, dealId, contactIds } = body;
 
   try {
+    // Safely handle contactIds array (ensure it exists and filters out invalid values)
+    const validContactIds = Array.isArray(contactIds) 
+      ? contactIds.filter((id: any) => typeof id === 'string') 
+      : [];
+
     const task = await prisma.task.create({
       data: {
         title,
         description,
-        priority: parseInt(priority, 10),
+        priority: priority ? parseInt(priority, 10) : 1,
         startDate: startDate ? new Date(startDate) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
         userId: user.id,
-        dealId: dealId || null,
+        // Only connect dealId if it's a valid string
+        dealId: (typeof dealId === 'string' && dealId.length > 0) ? dealId : null,
         contacts: {
-          connect: contactIds.map((id: string) => ({ id })),
+          connect: validContactIds.map((id: string) => ({ id })),
         },
       },
       include: {

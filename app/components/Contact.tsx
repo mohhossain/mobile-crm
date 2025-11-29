@@ -1,9 +1,7 @@
 "use client";
 
 import React from "react";
-import { TrashIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
-import { toast, Bounce } from "react-toastify";
 
 interface Contact {
   id: string;
@@ -15,148 +13,44 @@ interface Contact {
   tags: string[];
 }
 
-interface ContactProps {
-  contact: Contact;
-}
-
-export default function ContactCard({ contact }: ContactProps) {
+export default function ContactCard({ contact }: { contact: Contact }) {
   const router = useRouter();
 
-  const notifySuccess = (message: string) => {
-    toast(message, {
-      toastId: `success-${contact.id}`,
-      position: "top-right",
-      autoClose: 1000,
-      hideProgressBar: false,
-      closeOnClick: false,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-      transition: Bounce,
-    });
+  const handleClick = () => {
+    router.push(`/contacts/${contact.id}`);
   };
 
-  const notifyError = (message: string) => {
-    toast.error(message, {
-      toastId: `error-${contact.id}`,
-      position: "top-right",
-      autoClose: 1000,
-      hideProgressBar: false,
-      closeOnClick: false,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-      transition: Bounce,
-    });
-  }
-
-  // handle the delete action
-
-  const handleDelete = async () => {
-    try {
-      const response = await fetch(`/api/leads`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id: contact.id }),
-      });
-
-      if (response.ok) {
-        notifySuccess(`Contact ${contact.name} deleted successfully!`);
-        router.refresh() // Delay to allow the toast to show
-      }
-      else {
-        notifyError("Failed to delete contact");
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to delete contact");
-      }
-
-      // Redirect or update the UI after deletion
-       // This will refresh the current page to reflect the deletion
-
-      // Optionally, you can refresh the contacts list or show a success message
-    } catch (error) {
-      console.error("Error deleting contact:", error);
-    }
-  };
-
-  // background color base content from daisyUI
   return (
-    <div className={`card bg-base-100 min-w-70 shadow-sm`}>
-      {/* add a delete icon button */}
-
-      <div className="card-actions justify-end">
-        <button
-          onClick={() =>
-            // log the contact object
-            (console.log("Deleting contact:", contact.name),
-            document.getElementById(
-              `modal-${contact.id}`
-            ) as HTMLDialogElement | null)?.showModal()
-          }
-          className="btn btn-ghost btn-sm"
-        >
-          <TrashIcon className="h-5 w-5 text-gray-500 hover:text-red-500" />
-        </button>
-        <dialog id={`modal-${contact.id}`} className="modal">
-          <div className="modal-box bg-warning text-warning-content">
-            <h3 className="font-bold text-lg">Delete Confirmation</h3>
-            <p className="py-4">
-              Are you sure you want to delete{" "}
-              <span className="text-error-content">{contact.name}</span>?
-            </p>
-            <form method="dialog" className="modal-action">
-              <button onClick={handleDelete} className="btn btn-error">
-                Yes
-              </button>
-              <button className="btn btn-primary">No</button>
-            </form>
-          </div>
-          <form method="dialog" className="modal-backdrop">
-            <button>close</button>
-          </form>
-        </dialog>
-      </div>
-
-      <div className="card-body max-w w-full">
+    <div 
+      onClick={handleClick}
+      className="card bg-base-100 min-w-72 shadow-sm hover:shadow-md transition-shadow cursor-pointer border border-base-200"
+    >
+      <div className="card-body p-4 flex flex-row items-center gap-4">
         {contact.imageUrl ? (
-          <div className="avatar">
-            <div className="w-16 rounded-full">
-              <img
-                src={contact.imageUrl}
-                alt={contact.name ?? undefined}
-                className="w-full h-full object-cover rounded-full"
-              />
-            </div>
-          </div>
+          <img
+            src={contact.imageUrl}
+            alt={contact.name ?? ""}
+            className="w-12 h-12 rounded-full object-cover"
+          />
         ) : (
-          <div className="avatar avatar-placeholder">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center bg-base-200">
-              <span className="text-gray-500 text-lg">
-                {(contact.name?.charAt(0)?.toUpperCase() ?? "")}
-              </span>
-            </div>
+          <div className="w-12 h-12 rounded-full bg-neutral text-neutral-content flex items-center justify-center text-lg font-bold">
+            {(contact.name?.charAt(0)?.toUpperCase() ?? "?")}
           </div>
         )}
-        <h2 className="card-title">{contact.name}</h2>
-        <p className="text-sm text-gray-500">{contact.email}</p>
-        <p className="text-sm text-gray-500">{contact.phone}</p>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {contact.tags.map((tag) => (
-            <span
-              key={tag}
-              className="badge badge-primary badge-outline text-xs"
-            >
-              {tag}
-            </span>
-          ))}
+        
+        <div className="flex-1 min-w-0">
+          <h2 className="card-title text-base truncate">{contact.name}</h2>
+          <p className="text-xs text-gray-500 truncate">{contact.email}</p>
+          <div className="flex gap-1 mt-1 overflow-hidden">
+             {contact.tags.slice(0, 2).map(t => (
+               <span key={t} className="badge badge-xs badge-outline">{t}</span>
+             ))}
+          </div>
         </div>
-        <p className="text-sm text-primary"> {contact.status}</p>
+
+        <div className={`badge badge-sm ${contact.status === 'NEW' ? 'badge-primary' : 'badge-ghost'}`}>
+          {contact.status}
+        </div>
       </div>
     </div>
   );
