@@ -15,7 +15,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     where.status = status;
   }
 
-  const deals = await prisma.deal.findMany({
+  const dealsRaw = await prisma.deal.findMany({
     where,
     orderBy: { updatedAt: 'desc' },
     include: {
@@ -23,6 +23,15 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
       contacts: true,
     },
   });
+
+  const deals = dealsRaw.map(deal => ({
+    ...deal,
+    contacts: deal.contacts.map(contact => ({
+      id: contact.id,
+      name: contact.name,
+      imageUrl: contact.imageUrl ?? undefined,
+    })),
+  }));
 
   const totalValue = deals.reduce((sum, deal) => sum + deal.amount, 0);
 

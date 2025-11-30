@@ -12,7 +12,7 @@ import AddNotes from "./AddNotes";
 interface Contact {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
 }
 
 interface ExpenseDraft {

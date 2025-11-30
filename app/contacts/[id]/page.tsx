@@ -63,7 +63,14 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
                </div>
              ) : (
                contact.deals.map(deal => (
-                 <DealCard key={deal.id} deal={deal} />
+                 <DealCard key={deal.id} deal={{
+                   ...deal,
+                   contacts: deal.contacts.map(c => ({
+                     id: c.id,
+                     name: c.name,
+                     imageUrl: c.imageUrl ?? undefined
+                   }))
+                 }} />
                ))
              )}
            </div>

@@ -33,7 +33,16 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
   const safeContact = {
     ...contact,
     tags: contact.tags.map(t => ({ id: t.id, name: t.name })),
-    imageUrl: contact.imageUrl ?? null
+    imageUrl: contact.imageUrl ?? null,
+    deals: contact.deals.map(deal => ({
+      ...deal,
+      contacts: deal.contacts.map(c => ({
+        id: c.id,
+        name: c.name,
+        imageUrl: c.imageUrl ?? undefined
+      })),
+      tags: deal.tags.map(t => ({ id: t.id, name: t.name }))
+    }))
   };
 
   return (
@@ -52,17 +61,17 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
         <div className="space-y-4">
            <div className="flex items-center gap-2 pb-2 border-b">
              <BriefcaseIcon className="w-5 h-5 text-primary" />
-             <h3 className="text-lg font-bold">Deals Pipeline</h3>
-             <span className="badge badge-neutral badge-sm">{contact.deals.length}</span>
+             <h3 className="text-lg font-bold">Related Deals</h3>
+             <span className="badge badge-primary badge-sm">{safeContact.deals.length}</span>
            </div>
-           
+
            <div className="space-y-3">
-             {contact.deals.length === 0 ? (
+             {safeContact.deals.length === 0 ? (
                <div className="bg-base-100 p-8 rounded-xl text-center border border-dashed border-base-300">
                  <p className="text-gray-400">No active deals.</p>
                </div>
              ) : (
-               contact.deals.map(deal => (
+               safeContact.deals.map(deal => (
                  <DealCard key={deal.id} deal={deal} />
                ))
              )}

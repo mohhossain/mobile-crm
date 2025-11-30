@@ -21,10 +21,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       notes: {
         orderBy: { createdAt: 'asc' } 
       },
-      contacts: true,
-      expenses: {
-        orderBy: { date: 'desc' }
-      }
+      contacts: true
     },
   });
 
