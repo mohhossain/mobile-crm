@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { TrashIcon } from '@heroicons/react/24/outline'
 
 interface Props {
   dealId: string
@@ -20,41 +21,47 @@ export default function DeleteDealButton({ dealId }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: dealId }),
       })
+      
       if (!res.ok) throw new Error('Failed to delete deal')
-      router.back()
+      
+      // Redirect to the main deals page and refresh data
+      router.push('/deals')
+      router.refresh()
     } catch (err) {
       console.error(err)
+      alert("Failed to delete deal")
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <>
-      {!confirm ? (
+  if (confirm) {
+    return (
+      <div className="join">
         <button
-          className="btn btn-outline btn-error btn-sm"
-          onClick={() => setConfirm(true)}
+          className="btn btn-error btn-sm join-item"
+          onClick={handleDelete}
+          disabled={loading}
         >
-          Delete
+          {loading ? 'Deleting...' : 'Confirm Delete'}
         </button>
-      ) : (
-        <div className="space-x-1">
-          <button
-            className="btn btn-error btn-sm"
-            onClick={handleDelete}
-            disabled={loading}
-          >
-            {loading ? 'Deleting...' : 'Confirm'}
-          </button>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => setConfirm(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-    </>
+        <button
+          className="btn btn-ghost btn-sm join-item border border-base-300"
+          onClick={() => setConfirm(false)}
+          disabled={loading}
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      className="btn btn-outline btn-error btn-sm gap-2"
+      onClick={() => setConfirm(true)}
+    >
+      <TrashIcon className="w-4 h-4" /> Delete
+    </button>
   )
 }

@@ -3,57 +3,60 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // or sqlite/mysql depending on your use
+  provider = "postgresql" // or sqlite/mysql
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String    @id @default(uuid())
-  clerkId   String    @unique // Clerk user ID
-  name      String
-  email     String    @unique
-  gigs      Gig[]
-  contacts  Contact[]
-  createdAt DateTime  @default(now())
-  Task      Task[]
-  deals     Deal[]
-  updatedAt DateTime @updatedAt @default(now())
-  services  Service[]
-  notes     Note[] // optional, if the user has notes
+  id                 String    @id @default(uuid())
+  clerkId            String    @unique
+  name               String
+  email              String    @unique
+  googleAccessToken  String?
+  googleRefreshToken String?
+  gigs               Gig[]
+  contacts           Contact[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+  Task               Task[]
+  deals              Deal[]
+  services           Service[]
+  notes              Note[]
+  meetings           Meeting[]
+  expenses           Expense[]
 }
 
 model Gig {
-  id        String    @id @default(uuid())
-  name      String
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  contacts  Contact[] @relation("GigContacts")
-  deals     Deal[]
-  createdAt DateTime  @default(now())
-  Task      Task[]
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  name        String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  contacts    Contact[] @relation("GigContacts")
+  deals       Deal[]
+  createdAt   DateTime  @default(now())
+  Task        Task[]
+  updatedAt   DateTime  @updatedAt
   description String?
-  services  Service[] @relation("GigServices")
-  
+  services    Service[] @relation("GigServices")
 }
 
 model Contact {
-  id        String   @id @default(uuid())
+  id        String     @id @default(uuid())
   name      String
   email     String?
   phone     String?
   userId    String
-  // image url is optional
   imageUrl  String?
-  status    LeadStatus   @default(NEW) 
-  user      User     @relation(fields: [userId], references: [id])
-  gigs      Gig[]    @relation("GigContacts")
-  tags      Tag[]    @relation("ContactTags")
-  createdAt DateTime @default(now())
-  tasks      Task[]
-  updatedAt DateTime @updatedAt @default(now())
-  deals     Deal[]   @relation("ContactDeals")
-  notes     Note[] // optional, if the contact has notes
+  status    LeadStatus @default(NEW)
+  user      User       @relation(fields: [userId], references: [id])
+  gigs      Gig[]      @relation("GigContacts")
+  tags      Tag[]      @relation("ContactTags")
+  createdAt DateTime   @default(now())
+  tasks     Task[]     @relation("_ContactToTask")
+  updatedAt DateTime   @default(now()) @updatedAt
+  deals     Deal[]     @relation("ContactDeals")
+  notes     Note[]
+  meetings  Meeting[]
 }
 
 model Deal {
@@ -62,79 +65,113 @@ model Deal {
   amount    Float
   status    DealStatus
   gigId     String?
-  gig       Gig?        @relation(fields: [gigId], references: [id])
+  gig       Gig?       @relation(fields: [gigId], references: [id])
   createdAt DateTime   @default(now())
-  tasks      Task[]
-  updatedAt DateTime @updatedAt @default(now())
-  contacts Contact[] @relation("ContactDeals")
-  userId   String
-  user     User      @relation(fields: [userId], references: [id])
-  tags     Tag[]    @relation("TagDeals")
-  closeDate DateTime? // optional, when the deal was closed
-  notes    Note[] // optional, if the deal has notes
+  tasks     Task[]
+  updatedAt DateTime   @default(now()) @updatedAt
+  contacts  Contact[]  @relation("ContactDeals")
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  tags      Tag[]      @relation("TagDeals")
+  closeDate DateTime?
+  notes     Note[]
+  meetings  Meeting[]
+  expenses  Expense[]
 }
 
 model Service {
-  id        String    @id @default(uuid())
-  name      String
+  id          String   @id @default(uuid())
+  name        String
   description String?
-  price     Float
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  gigs      Gig[]     @relation("GigServices")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  price       Float
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  gigs        Gig[]    @relation("GigServices")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 }
 
 model Note {
-  id        String    @id @default(uuid())
+  id        String   @id @default(uuid())
   content   String
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  contactId String? // optional, if the note is related to a contact
-  contact   Contact? @relation(fields: [contactId], references: [id])
-  dealId    String? // optional, if the note is related to a deal
-  deal      Deal?   @relation(fields: [dealId], references: [id])
-  taskId    String? // optional, if the note is related to a task
-  task      Task?   @relation(fields: [taskId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  dealId    String?
+  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Tag {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  contacts Contact[] @relation("ContactTags")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
-  deals    Deal[]   @relation("TagDeals")
+  id        String    @id @default(uuid())
+  name      String    @unique
+  contacts  Contact[] @relation("ContactTags")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deals     Deal[]    @relation("TagDeals")
 }
 
 model Task {
-  id      String     @id @default(uuid())
-  title   String
-
+  id          String     @id @default(uuid())
+  title       String
   description String?
-  priority Int @default(1) // 1 is low, 2 is medium, 3 is high
-  startDate DateTime? // optional, when the task starts
-  dueDate DateTime?
+  priority    Int        @default(1)
+  startDate   DateTime?
+  dueDate     DateTime?
+  status      TaskStatus @default(TO_DO)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  contacts    Contact[]  @relation("_ContactToTask")
+  gigId       String?
+  gig         Gig?       @relation(fields: [gigId], references: [id])
+  
+  dealId      String?
+  deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  
+  notes       Note[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
 
-  status  TaskStatus @default(TO_DO)
+model Meeting {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id])
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  contacts Contact[] 
-
-  gigId String? // optional
-  gig   Gig?    @relation(fields: [gigId], references: [id])
-
-  dealId String? // optional
-  deal   Deal?   @relation(fields: [dealId], references: [id])
-  notes   Note[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Expense {
+  id          String   @id @default(uuid())
+  description String
+  amount      Float
+  category    String   @default("OTHER")
+  date        DateTime @default(now())
+  
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum TaskStatus {

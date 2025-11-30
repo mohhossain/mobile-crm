@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/currentUser";
 
-
-// make a get/post/delete request to the deals route 
-
 export async function GET() {
     const user = await getCurrentUser();
 
@@ -13,17 +10,17 @@ export async function GET() {
     }
 
     try {
-        // Fetch deals for the user
         const deals = await prisma.deal.findMany({
-            where: { userId: user.id }, // Use the user's ID from the database
+            where: { userId: user.id },
             include: {
-                tags: true, // Include tags related to the deal
-                contacts: true, // Include contacts related to the deal
+                tags: true,
+                contacts: true,
                 notes: {
                     include: {
-                        user: true, // Include user who created the note
+                        user: true,
                     },
                 },
+                expenses: true, // Include expenses in fetch
             },
         });
 
@@ -42,14 +39,15 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { title, amount, tags, status, contactIds, closeDate, notes } = body;
+  const { title, amount, tags, status, contactIds, closeDate, notes, expenses } = body;
 
   // Defensive defaults
   const safeTags = Array.isArray(tags) ? tags : [];
   const safeContactIds = Array.isArray(contactIds) ? contactIds : [];
-  const safeNotes = Array.isArray(notes) ? notes.filter(n => typeof n === "string" && n.trim() !== "") : [];
+  const safeNotes = Array.isArray(notes) ? notes.filter((n: any) => typeof n === "string" && n.trim() !== "") : [];
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
 
-  // Validate amount - convert to number or null
+  // Validate amount
   const parsedAmount = typeof amount === "number" && !isNaN(amount) ? amount : null;
 
   try {
@@ -60,21 +58,34 @@ export async function POST(request: Request) {
         status: status || "PENDING",
         userId: user.id,
         closeDate: closeDate ? new Date(closeDate) : null,
+        // 1. Connect/Create Tags
         tags: safeTags.length > 0 ? {
           connectOrCreate: safeTags.map((tag: string) => ({
             where: { name: tag },
             create: { name: tag },
           })),
         } : undefined,
+        // 2. Connect Contacts
         contacts: safeContactIds.length > 0 ? {
           connect: safeContactIds.map((id: string) => ({ id })),
         } : undefined,
+        // 3. Create Notes
         notes: safeNotes.length > 0 ? {
           create: safeNotes.map((note: string) => ({
             content: note,
             userId: user.id,
           })),
         } : undefined,
+        // 4. Create Expenses (NEW)
+        expenses: safeExpenses.length > 0 ? {
+          create: safeExpenses.map((exp: any) => ({
+            description: exp.description,
+            amount: parseFloat(exp.amount),
+            category: exp.category || "OTHER",
+            date: exp.date ? new Date(exp.date) : new Date(),
+            userId: user.id
+          }))
+        } : undefined
       },
     });
 
@@ -86,7 +97,6 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    
     const user = await getCurrentUser();
 
     if (!user) {
@@ -101,12 +111,10 @@ export async function DELETE(request: Request) {
     }
 
     try {
-        // Delete the deal by ID from params check if the deal belongs to the user
-
         const deletedDeal = await prisma.deal.delete({
             where: {
                 id,
-                userId: user.id, // Ensure the deal belongs to the user
+                userId: user.id,
             },
         });
 
@@ -116,9 +124,3 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
-
-// search query for deals
-
-
-
-

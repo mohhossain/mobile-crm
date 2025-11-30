@@ -1,205 +1,393 @@
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import Contacts from "./components/Contacts";
-import Deals from "./components/Deals";
 import Link from "next/link";
 import { 
   PlusIcon, 
-  CurrencyDollarIcon, 
-  ChartBarIcon, 
-  PresentationChartLineIcon 
+  ExclamationCircleIcon,
+  ClockIcon,
+  FireIcon,
+  ChatBubbleLeftRightIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  BanknotesIcon,
+  UserIcon,
+  ChevronRightIcon
 } from "@heroicons/react/24/solid";
+import ContactCard from "./components/Contact";
+import DealCard from "./components/DealCard";
+import TaskCard from "./components/TaskCard";
 
-async function getDashboardStats(userId: string) {
-  // Fetch all deals to perform advanced calculations in memory
-  // This avoids complex groupBys that might be tricky with different Prisma versions
-  const deals = await prisma.deal.findMany({
-    where: { userId },
-    select: { id: true, amount: true, status: true }
+async function getSmartDashboardData(userId: string) {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [deals, tasks, contacts, rawNotes, rawExpenses, expenseStats] = await Promise.all([
+    prisma.deal.findMany({
+      where: { userId },
+      include: { 
+        tags: true, 
+        contacts: { select: { id: true, name: true, imageUrl: true } } 
+      },
+      orderBy: { updatedAt: 'desc' }
+    }),
+    prisma.task.findMany({
+      where: { userId, status: { not: 'DONE' } },
+      include: { deal: true },
+      orderBy: { dueDate: 'asc' }
+    }),
+    prisma.contact.findMany({
+      where: { userId, status: 'HOT' },
+      include: { tags: true },
+      take: 5
+    }),
+    // Fetch more items than needed to account for filtering out orphans
+    prisma.note.findMany({
+      where: { userId },
+      take: 20, 
+      orderBy: { createdAt: 'desc' },
+      include: { deal: true, contact: true }
+    }),
+    prisma.expense.findMany({
+      where: { userId },
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: { deal: true }
+    }),
+    prisma.expense.aggregate({
+      where: { userId },
+      _sum: { amount: true }
+    })
+  ]);
+
+  // --- CLEAN & MIX ACTIVITIES ---
+  const activities = [
+    ...rawNotes
+      .filter(n => {
+        if (n.dealId && !n.deal) return false;
+        if (n.contactId && !n.contact) return false;
+        if (!n.deal && !n.contact) return false;
+        return true;
+      })
+      .map(n => ({ type: 'NOTE', date: n.createdAt, data: n, deal: n.deal })),
+
+    ...rawExpenses
+      .filter(e => {
+        if (e.dealId && !e.deal) return false;
+        return !!e.deal;
+      })
+      .map(e => ({ type: 'EXPENSE', date: e.createdAt, data: e, deal: e.deal }))
+  ]
+  .sort((a, b) => b.date.getTime() - a.date.getTime())
+  .slice(0, 6);
+
+  // --- ANALYTICS ---
+  const staleDeals = deals.filter(
+    d => ['NEGOTIATION', 'PENDING'].includes(d.status) && 
+    new Date(d.updatedAt) < sevenDaysAgo
+  );
+
+  const urgentTasks = tasks.filter(t => {
+    if (!t.dueDate) return false;
+    const due = new Date(t.dueDate);
+    return due <= now || due.toDateString() === now.toDateString();
   });
 
-  const taskCount = await prisma.task.count({
-    where: { userId, status: { not: 'DONE' } }
-  });
+  const wonRevenue = deals
+    .filter(d => d.status === 'WON')
+    .reduce((sum, d) => sum + d.amount, 0);
+    
+  const totalExpenses = expenseStats._sum.amount || 0;
+  const netProfit = wonRevenue - totalExpenses;
+  const profitMargin = wonRevenue > 0 ? (netProfit / wonRevenue) * 100 : 0;
 
-  // 1. Pipeline Calculation
-  const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING'].includes(d.status));
+  const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING', 'OPEN'].includes(d.status));
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
 
-  // 2. Weighted Projection (Financing Tool)
-  // Logic: Negotiation = 50% probability, Pending = 80% probability
-  const projectedRevenue = activeDeals.reduce((sum, d) => {
-    const probability = d.status === 'PENDING' ? 0.8 : 0.5;
-    return sum + (d.amount * probability);
-  }, 0);
-
-  // 3. Win Rate Metric
-  const closedDeals = deals.filter(d => ['WON', 'LOST'].includes(d.status));
-  const wonDeals = closedDeals.filter(d => d.status === 'WON');
-  const winRate = closedDeals.length > 0 
-    ? Math.round((wonDeals.length / closedDeals.length) * 100) 
-    : 0;
-
-  // 4. Average Deal Size
-  const avgDealSize = deals.length > 0 
-    ? deals.reduce((sum, d) => sum + d.amount, 0) / deals.length 
-    : 0;
-
-  // 5. Chart Data: Distribution by Status
-  // Normalize values for the bar chart (percentage of total value)
-  const totalValue = deals.reduce((sum, d) => sum + d.amount, 0) || 1;
-  const chartData = [
-    { 
-      label: 'Won', 
-      amount: wonDeals.reduce((sum, d) => sum + d.amount, 0), 
-      color: 'bg-success',
-      width: `${(wonDeals.reduce((sum, d) => sum + d.amount, 0) / totalValue) * 100}%`
-    },
-    { 
-      label: 'Pending', 
-      amount: deals.filter(d => d.status === 'PENDING').reduce((sum, d) => sum + d.amount, 0), 
-      color: 'bg-warning',
-      width: `${(deals.filter(d => d.status === 'PENDING').reduce((sum, d) => sum + d.amount, 0) / totalValue) * 100}%`
-    },
-    { 
-      label: 'Negotiation', 
-      amount: deals.filter(d => d.status === 'NEGOTIATION').reduce((sum, d) => sum + d.amount, 0), 
-      color: 'bg-info',
-      width: `${(deals.filter(d => d.status === 'NEGOTIATION').reduce((sum, d) => sum + d.amount, 0) / totalValue) * 100}%`
-    }
-  ].filter(d => d.amount > 0);
-
   return {
-    pipelineValue,
     activeDealsCount: activeDeals.length,
-    pendingTasks: taskCount,
-    projectedRevenue,
-    winRate,
-    avgDealSize,
-    chartData
+    pipelineValue,
+    staleDeals,
+    urgentTasks,
+    hotLeads: contacts,
+    activities, 
+    recentDeals: deals.slice(0, 3),
+    financials: {
+      revenue: wonRevenue,
+      expenses: totalExpenses,
+      profit: netProfit,
+      margin: profitMargin
+    }
   };
 }
 
 export default async function Home() {
   const user = await getCurrentUser();
+  if (!user) return <div className="p-8 text-center text-gray-500">Please sign in to access your smart dashboard.</div>;
 
-  if (!user) return <div className="p-4">Please sign in.</div>;
+  const data = await getSmartDashboardData(user.id);
 
-  const stats = await getDashboardStats(user.id);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="flex flex-col gap-6 p-4 pb-24 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-8">
+      
+      {/* 1. HEADER SECTION */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-gray-500 text-sm">Welcome back, {user.name.split(' ')[0]}</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-base-content">
+            {greeting}, {user.name.split(' ')[0]}
+          </h1>
+          <p className="text-base-content/60 mt-1 font-medium">
+            Here's what's happening with your business today.
+          </p>
         </div>
-        <Link href="/deals" className="btn btn-circle btn-primary btn-sm shadow-lg">
-          <PlusIcon className="w-5 h-5" />
-        </Link>
-      </div>
-
-      {/* Top Level Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Pipeline */}
-        <div className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-5">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <ChartBarIcon className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Total Pipeline</span>
-            </div>
-            <div className="text-3xl font-bold text-primary">
-              ${stats.pipelineValue.toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              Across {stats.activeDealsCount} active deals
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Projected Revenue (Financing Tool) */}
-        <div className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-5">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <PresentationChartLineIcon className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Projected Revenue</span>
-            </div>
-            <div className="text-3xl font-bold text-secondary">
-              ${stats.projectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              Weighted by deal probability
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Performance */}
-        <div className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-5">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <CurrencyDollarIcon className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">Avg Deal Size</span>
-            </div>
-            <div className="flex justify-between items-end">
-              <div className="text-3xl font-bold">
-                ${stats.avgDealSize.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </div>
-              <div className="badge badge-lg badge-outline gap-1">
-                Win Rate: <span className="font-bold text-success">{stats.winRate}%</span>
-              </div>
-            </div>
-          </div>
+        <div className="flex gap-2">
+           <Link href="/deals" className="btn btn-primary btn-sm gap-2 shadow-lg shadow-primary/20">
+             <PlusIcon className="w-4 h-4" /> New Deal
+           </Link>
+           <Link href="/tasks" className="btn btn-neutral btn-sm gap-2">
+             <PlusIcon className="w-4 h-4" /> New Task
+           </Link>
         </div>
       </div>
 
-      {/* Visual Pipeline Distribution */}
-      {stats.chartData.length > 0 && (
-        <div className="card bg-base-100 shadow-sm border border-base-200 p-6">
-          <h3 className="font-bold text-sm text-gray-500 uppercase mb-4">Pipeline Distribution</h3>
-          
-          {/* Bar Chart Container */}
-          <div className="flex w-full h-8 rounded-full overflow-hidden mb-4 bg-base-200">
-            {stats.chartData.map((item) => (
-              <div 
-                key={item.label} 
-                className={`h-full ${item.color} hover:opacity-80 transition-opacity`} 
-                style={{ width: item.width }}
-                title={`${item.label}: $${item.amount.toLocaleString()}`}
-              />
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap gap-6">
-            {stats.chartData.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold">{item.label}</span>
-                  <span className="text-xs text-gray-500">${item.amount.toLocaleString()}</span>
-                </div>
+      {/* 2. FINANCIAL PULSE (Improved Card Design) */}
+      <div className="card bg-base-100 shadow-md border border-base-200">
+        <div className="card-body p-6">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            
+            {/* Main Metric: Net Profit */}
+            <div className="flex-1 w-full text-center lg:text-left border-b lg:border-b-0 lg:border-r border-base-200 pb-4 lg:pb-0 lg:pr-6">
+              <div className="text-sm font-bold uppercase text-base-content/40 tracking-wider flex items-center justify-center lg:justify-start gap-2 mb-1">
+                <BanknotesIcon className="w-4 h-4" /> Net Profit
               </div>
-            ))}
+              <div className={`text-4xl font-black tracking-tight ${data.financials.profit >= 0 ? 'text-success' : 'text-error'}`}>
+                {data.financials.profit >= 0 ? '+' : '-'}${Math.abs(data.financials.profit).toLocaleString()}
+              </div>
+              <div className="mt-2 text-sm font-medium">
+                {data.financials.profit >= 0 ? (
+                  <span className="text-success bg-success/10 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                    <ArrowTrendingUpIcon className="w-3 h-3" /> Profitable
+                  </span>
+                ) : (
+                  <span className="text-error bg-error/10 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                    <ArrowTrendingDownIcon className="w-3 h-3" /> Burning Cash
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Secondary Metrics */}
+            <div className="flex-1 w-full grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-xs uppercase font-bold text-base-content/40 mb-1">Revenue</div>
+                <div className="text-xl font-bold text-base-content">${data.financials.revenue.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase font-bold text-base-content/40 mb-1">Expenses</div>
+                <div className="text-xl font-bold text-error">${data.financials.expenses.toLocaleString()}</div>
+              </div>
+            </div>
+
+            {/* Navigation Action */}
+            <div className="flex-none w-full lg:w-auto">
+              <Link href="/finance" className="btn btn-outline btn-block lg:btn-wide group">
+                Financial Dashboard 
+                <ChevronRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Main Content Sections */}
-      <div className="flex flex-col gap-8">
-        <div>
-          <Contacts />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div>
-           <div className="flex justify-between items-center mb-3 px-1">
-             <h2 className="text-lg font-bold flex items-center gap-2">
-               Active Deals
-               <span className="badge badge-neutral badge-sm">{stats.activeDealsCount}</span>
-             </h2>
-             <Link href="/deals" className="text-xs btn btn-ghost btn-xs">View All</Link>
+        {/* LEFT COLUMN: ACTION ITEMS (2/3 width) */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* URGENT TASKS CARD */}
+          {data.urgentTasks.length > 0 ? (
+            <div className="card bg-base-100 shadow-sm border border-error/20 ring-1 ring-error/5">
+              <div className="card-body p-5">
+                <h2 className="text-xs font-bold uppercase text-error flex items-center gap-2 mb-3 tracking-wider">
+                  <ExclamationCircleIcon className="w-4 h-4" /> Urgent Tasks ({data.urgentTasks.length})
+                </h2>
+                <div className="space-y-2">
+                  {data.urgentTasks.slice(0, 3).map(task => (
+                    <TaskCard key={task.id} task={task} />
+                  ))}
+                </div>
+                {data.urgentTasks.length > 3 && (
+                  <Link href="/tasks" className="text-center text-xs text-base-content/50 hover:text-primary mt-2 block">
+                    + {data.urgentTasks.length - 3} more
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="card bg-base-100 shadow-sm border border-base-200">
+               <div className="card-body p-6 flex flex-row items-center gap-4">
+                  <div className="p-3 bg-success/10 text-success rounded-full ring-1 ring-success/20">
+                    <ClockIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base-content">All caught up!</h3>
+                    <p className="text-xs text-base-content/60">No overdue tasks. You're on top of things.</p>
+                  </div>
+               </div>
+            </div>
+          )}
+
+          {/* COMBINED ACTIVITY FEED */}
+          <div>
+             <h3 className="font-bold text-lg flex items-center gap-2 px-1 mb-4 text-base-content">
+               <ChatBubbleLeftRightIcon className="w-5 h-5 text-base-content/40" /> Recent Activity
+             </h3>
+             {data.activities.length === 0 ? (
+               <div className="text-center py-10 border border-dashed border-base-300 rounded-xl">
+                 <p className="text-base-content/40 text-sm">No recent activity. Start adding notes or expenses!</p>
+               </div>
+             ) : (
+               <div className="bg-base-100 rounded-2xl shadow-sm border border-base-200 divide-y divide-base-100 overflow-hidden">
+                 {data.activities.map((activity, i) => {
+                   const isNote = activity.type === 'NOTE';
+                   const noteData = isNote ? activity.data as any : null;
+                   const expenseData = !isNote ? activity.data as any : null;
+                   
+                   let linkHref = '#';
+                   if (activity.deal) {
+                     linkHref = `/deals/${activity.deal.id}`;
+                   } else if (isNote && noteData.contact) {
+                     linkHref = `/contacts/${noteData.contact.id}`;
+                   }
+                   const isClickable = linkHref !== '#';
+
+                   return (
+                     <Link 
+                       key={`${activity.type}-${i}`} 
+                       href={linkHref}
+                       className={`p-4 flex gap-4 transition-colors ${isClickable ? 'hover:bg-base-50 cursor-pointer' : 'cursor-default opacity-80'}`}
+                     >
+                        <div className="mt-1">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-opacity-20 ${isNote ? 'bg-primary/10 text-primary ring-primary' : 'bg-error/10 text-error ring-error'}`}>
+                             {isNote ? <ChatBubbleLeftRightIcon className="w-4 h-4" /> : <BanknotesIcon className="w-4 h-4" />}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                             <span className={`text-[10px] font-bold uppercase tracking-wider ${isNote ? 'text-primary' : 'text-error'}`}>
+                                {isNote ? 'New Note' : 'Expense Added'}
+                             </span>
+                             <span className="text-[10px] text-base-content/40">
+                               {new Date(activity.date).toLocaleDateString()}
+                             </span>
+                          </div>
+                          
+                          <p className="text-sm text-base-content/80 line-clamp-1 mt-0.5 font-medium">
+                            {isNote ? `"${noteData.content}"` : `${expenseData.description} (-$${expenseData.amount})`}
+                          </p>
+                          
+                          <div className="flex gap-2 mt-2">
+                            {activity.deal && (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-base-200 text-[10px] font-bold text-base-content/60 max-w-full">
+                                <span className="truncate">Deal: {activity.deal.title}</span>
+                                <ArrowTrendingUpIcon className="w-3 h-3 opacity-50" />
+                              </div>
+                            )}
+                            {isNote && noteData.contact && !activity.deal && (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-base-200 text-[10px] font-bold text-base-content/60 max-w-full">
+                                <span className="truncate">Contact: {noteData.contact.name}</span>
+                                <UserIcon className="w-3 h-3 opacity-50" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                     </Link>
+                   );
+                 })}
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: INSIGHTS & LEADS (1/3 width) */}
+        <div className="space-y-8">
+           
+           {/* PIPELINE HEALTH */}
+           <div className="card bg-base-100 shadow-sm border border-base-200">
+             <div className="card-body p-5">
+               <h3 className="text-xs font-bold uppercase text-base-content/40 flex items-center gap-2 mb-4 tracking-widest">
+                 <ChartBarIcon className="w-4 h-4" /> Active Pipeline
+               </h3>
+               
+               <div className="text-2xl font-bold text-base-content mb-1">
+                 ${data.pipelineValue.toLocaleString()}
+               </div>
+               <div className="text-xs text-base-content/60 mb-4">
+                 Potential value across {data.activeDealsCount} active deals
+               </div>
+
+               <Link href="/deals" className="btn btn-xs btn-outline w-full">
+                 Go to Pipeline
+               </Link>
+             </div>
            </div>
-           <Deals /> 
+
+           {/* HOT LEADS */}
+           <div>
+             <div className="flex items-center justify-between px-1 mb-3">
+                <div className="flex items-center gap-2">
+                  <FireIcon className="w-4 h-4 text-orange-500" />
+                  <h3 className="font-bold text-xs uppercase text-base-content/50 tracking-wider">Hot Leads</h3>
+                </div>
+                <Link href="/contacts" className="text-[10px] link link-hover text-base-content/40">View All</Link>
+             </div>
+             {data.hotLeads.length === 0 ? (
+               <div className="p-6 bg-base-200/50 border border-dashed border-base-300 rounded-xl text-center">
+                 <p className="text-base-content/40 text-xs">No 'Hot' leads marked.</p>
+               </div>
+             ) : (
+               <div className="flex gap-3 overflow-x-auto pb-4 pt-1 no-scrollbar snap-x">
+                 {data.hotLeads.map(contact => (
+                    <div key={contact.id} className="snap-start shrink-0">
+                      <ContactCard 
+                        contact={{...contact, tags: contact.tags.map(t => t.name)}} 
+                      />
+                    </div>
+                 ))}
+               </div>
+             )}
+           </div>
+
+           {/* STALE DEALS (Moved to Right Col) */}
+           {data.staleDeals.length > 0 && (
+             <div className="card bg-base-100 shadow-sm border border-warning/30">
+               <div className="card-body p-5">
+                 <h2 className="text-xs font-bold uppercase text-warning flex items-center gap-2 mb-4 tracking-wider">
+                   <ClockIcon className="w-4 h-4" /> Stalling Deals
+                 </h2>
+                 <div className="space-y-2">
+                   {data.staleDeals.map(deal => (
+                     <DealCard 
+                        key={deal.id} 
+                        deal={{
+                            ...deal,
+                            contacts: deal.contacts.map(c => ({ 
+                                id: c.id, 
+                                name: c.name, 
+                                imageUrl: c.imageUrl || undefined 
+                            }))
+                        }} 
+                     />
+                   ))}
+                 </div>
+               </div>
+             </div>
+           )}
+
         </div>
       </div>
     </div>
