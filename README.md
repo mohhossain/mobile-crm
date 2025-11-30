@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Pulse - Business Operating System
 
-## Getting Started
+The intelligent operating system for your business.
 
-First, run the development server:
+Pulse is a modern, all-in-one CRM and Financial Dashboard designed to be the heartbeat of your daily operations. Unlike standard CRMs that just store data, Pulse is smart—it tracks your financial health, flags stale deals, and helps you focus on what matters most.
 
-```bash
+🚀 Features
+
+🧠 Smart Dashboard
+
+Morning Briefing: Get an instant read on your business health (Profitable vs. Burning Cash).
+
+Urgent Tasks: Automatically surfaces overdue or due-today tasks.
+
+Stale Deal Detection: Flags deals that haven't been updated in 7+ days.
+
+Activity Feed: A unified timeline of notes and expenses linked to deals.
+
+💼 Deal Pipeline
+
+Kanban-ready Architecture: Manage deals through stages (Open, Negotiation, Pending, Won).
+
+Inline Management: Add tasks and notes directly within the deal view.
+
+Profitability Tracking: Track expenses per deal to calculate real Net Profit margins.
+
+💰 Financial Pulse
+
+Real-time P&L: Automatically calculates Net Profit (Won Revenue - Expenses).
+
+Forecasting: Weighted revenue projections based on deal stages.
+
+Expense Tracking: Log costs against deals or general overhead.
+
+Visual Reports: Monthly performance charts and burn rate analysis.
+
+📇 Contact Management
+
+Seamless Profile: Edit contact details and manage tags without leaving the page.
+
+History: View all related deals and tasks for every contact.
+
+🛠️ Tech Stack
+
+Framework: Next.js 15 (App Router)
+
+Database: PostgreSQL (via Prisma ORM)
+
+Authentication: Clerk
+
+Styling: Tailwind CSS + DaisyUI
+
+Deployment: Vercel
+
+📦 Getting Started
+
+Clone the repository:
+
+git clone [https://github.com/yourusername/pulse-crm.git](https://github.com/yourusername/pulse-crm.git)
+cd pulse-crm
+
+
+Install dependencies:
+
+npm install
+
+
+Set up Environment Variables:
+Create a .env file in the root directory and add the following keys:
+
+# Database
+DATABASE_URL="postgresql://user:password@host:port/db"
+
+# Authentication (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Image Uploads (Cloudinary)
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=...
+NEXT_PUBLIC_CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+# Optional: Google Integration
+# GOOGLE_CLIENT_ID=...
+# GOOGLE_CLIENT_SECRET=...
+# GOOGLE_REDIRECT_URI=...
+
+
+Initialize the Database:
+
+npx prisma db push
+
+
+Run the development server:
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open http://localhost:3000 with your browser to see the result.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+🤝 Contributing
 
-## Learn More
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-To learn more about Next.js, take a look at the following resources:
+📄 License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This project is licensed under the MIT License.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Built by me • Powered by Gemini
