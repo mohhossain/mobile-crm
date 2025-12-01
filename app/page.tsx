@@ -258,7 +258,7 @@ export default async function Home() {
                <div className="flex gap-3 overflow-x-auto pb-4 pt-1 no-scrollbar snap-x">
                  {data.activeContacts.map(contact => (
                     <div key={contact.id} className="snap-start shrink-0">
-                      <ContactCard contact={{...contact, imageUrl: contact.imageUrl, tags: contact.tags.map(t => t.name)}} />
+                      <ContactCard contact={{...contact, imageUrl: contact.imageUrl, tags: contact.tags.map(t => ({ name: t.name }))}} />
                     </div>
                  ))}
                </div>
