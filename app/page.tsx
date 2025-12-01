@@ -11,6 +11,9 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   BanknotesIcon,
+  BellAlertIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
   UserIcon,
   ChevronRightIcon
 } from "@heroicons/react/24/solid";
@@ -18,81 +21,160 @@ import ContactCard from "./components/Contact";
 import DealCard from "./components/DealCard";
 import TaskCard from "./components/TaskCard";
 
+// --- TYPES ---
+type AlertType = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
+
+interface SmartAlert {
+  id: string;
+  type: AlertType;
+  message: string;
+  subtext?: string;
+  link: string;
+  icon: any;
+}
+
 async function getSmartDashboardData(userId: string) {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-  // Fetch contacts sorted by interaction time
-  // FIX: Removed any conflicting 'select' and 'include'
-  const [deals, tasks, activeContacts, rawNotes, rawExpenses, expenseStats] = await Promise.all([
-    prisma.deal.findMany({ 
-      where: { userId }, 
+  const [deals, tasks, contacts, rawNotes, rawExpenses, expenseStats] = await Promise.all([
+    prisma.deal.findMany({
+      where: { userId },
       include: { 
         tags: true, 
-        // Valid nested select within include
-        contacts: { 
-          select: { 
-            id: true, 
-            name: true, 
-            imageUrl: true,
-            jobTitle: true, // Added context fields
-            company: true 
-          } 
-        } 
-      }, 
-      orderBy: { updatedAt: 'desc' } 
+        contacts: { select: { id: true, name: true, imageUrl: true } } 
+      },
+      orderBy: { updatedAt: 'desc' }
     }),
-    prisma.task.findMany({ 
-      where: { userId, status: { not: 'DONE' } }, 
-      include: { deal: true }, 
-      orderBy: { dueDate: 'asc' } 
+    prisma.task.findMany({
+      where: { userId, status: { not: 'DONE' } },
+      include: { deal: true },
+      orderBy: { dueDate: 'asc' }
     }),
-    
-    // SMART LIST: Fetch 10 most recently contacted people
-    // FIX: Pure 'include' here. No 'select' to avoid conflicts.
     prisma.contact.findMany({
-      where: { userId, lastContactedAt: { gte: sevenDaysAgo } },
+      where: { userId },
       include: { tags: true },
-      orderBy: { lastContactedAt: 'desc' },
-      take: 10
+      orderBy: { lastContactedAt: 'desc' }
     }),
-    
     prisma.note.findMany({
-      where: { userId, OR: [{ deal: { isNot: null } }, { contact: { isNot: null } }] },
-      take: 6, orderBy: { createdAt: 'desc' }, include: { deal: true, contact: true }
+      where: { userId },
+      take: 20, 
+      orderBy: { createdAt: 'desc' },
+      include: { deal: true, contact: true }
     }),
     prisma.expense.findMany({
-      where: { userId, deal: { isNot: null } },
-      take: 6, orderBy: { createdAt: 'desc' }, include: { deal: true }
+      where: { userId },
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: { deal: true }
     }),
-    prisma.expense.aggregate({ where: { userId }, _sum: { amount: true } })
+    prisma.expense.aggregate({
+      where: { userId },
+      _sum: { amount: true }
+    })
   ]);
 
+  // --- 1. GENERATE SMART ALERTS ---
+  const alerts: SmartAlert[] = [];
+
+  // A. Overdue Tasks (Critical)
+  const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < now);
+  if (overdueTasks.length > 0) {
+    alerts.push({
+      id: 'overdue-tasks',
+      type: 'CRITICAL',
+      message: `You have ${overdueTasks.length} overdue tasks.`,
+      subtext: "These items missed their deadline.",
+      link: '/tasks?filter=active', // Updated link to active filter
+      icon: ExclamationCircleIcon
+    });
+  }
+
+  // B. Closing Soon (Info)
+  const closingDeals = deals.filter(d => d.closeDate && new Date(d.closeDate) <= threeDaysFromNow && new Date(d.closeDate) >= now && d.status !== 'WON' && d.status !== 'LOST');
+  if (closingDeals.length > 0) {
+    alerts.push({
+      id: 'closing-soon',
+      type: 'INFO',
+      message: `${closingDeals.length} deals scheduled to close soon.`,
+      subtext: "Review them to ensure they land.",
+      link: '/deals',
+      icon: CalendarDaysIcon
+    });
+  }
+
+  // C. Stale Deals (Warning)
+  const staleDeals = deals.filter(
+    d => ['NEGOTIATION', 'PENDING'].includes(d.status) && 
+    new Date(d.updatedAt) < sevenDaysAgo
+  );
+  if (staleDeals.length > 0) {
+    alerts.push({
+      id: 'stale-deals',
+      type: 'WARNING',
+      message: `${staleDeals.length} deals are stalling.`,
+      subtext: "No activity in 7+ days.",
+      link: '/deals',
+      icon: ClockIcon
+    });
+  }
+
+  // D. Slipping Contacts (Warning)
+  const slippingContacts = contacts.filter(c => 
+    c.lastContactedAt && new Date(c.lastContactedAt) < fourteenDaysAgo
+  ).slice(0, 3); 
+  
+  if (slippingContacts.length > 0) {
+    alerts.push({
+      id: 'slipping-contacts',
+      type: 'WARNING',
+      message: `${slippingContacts.length} contacts are slipping away.`,
+      subtext: "Reconnect with your network.",
+      link: '/contacts',
+      icon: UserIcon
+    });
+  }
+
+  // --- 2. CLEAN & MIX ACTIVITIES ---
   const activities = [
-    ...rawNotes.map(n => ({ type: 'NOTE', date: n.createdAt, data: n, deal: n.deal })),
-    ...rawExpenses.map(e => ({ type: 'EXPENSE', date: e.createdAt, data: e, deal: e.deal }))
-  ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 6);
+    ...rawNotes
+      .filter(n => {
+        if (n.dealId && !n.deal) return false;
+        if (n.contactId && !n.contact) return false;
+        if (!n.deal && !n.contact) return false;
+        return true;
+      })
+      .map(n => ({ type: 'NOTE', date: n.createdAt, data: n, deal: n.deal })),
 
-  const staleDeals = deals.filter(d => ['NEGOTIATION', 'PENDING'].includes(d.status) && new Date(d.updatedAt) < sevenDaysAgo);
-  const urgentTasks = tasks.filter(t => {
-    if (!t.dueDate) return false;
-    const due = new Date(t.dueDate);
-    return due <= now || due.toDateString() === now.toDateString();
-  });
+    ...rawExpenses
+      .filter(e => {
+        if (e.dealId && !e.deal) return false;
+        return !!e.deal;
+      })
+      .map(e => ({ type: 'EXPENSE', date: e.createdAt, data: e, deal: e.deal }))
+  ]
+  .sort((a, b) => b.date.getTime() - a.date.getTime())
+  .slice(0, 6);
 
+  // --- 3. FINANCIALS ---
   const wonRevenue = deals.filter(d => d.status === 'WON').reduce((sum, d) => sum + d.amount, 0);
   const totalExpenses = expenseStats._sum.amount || 0;
   const netProfit = wonRevenue - totalExpenses;
   const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING', 'OPEN'].includes(d.status));
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
 
+  const activeContacts = contacts.filter(c => c.lastContactedAt && new Date(c.lastContactedAt) >= sevenDaysAgo).slice(0, 10);
+
   return {
+    alerts,
     activeDealsCount: activeDeals.length,
     pipelineValue,
-    staleDeals,
-    urgentTasks,
+    staleDeals, 
     activeContacts,
     activities, 
+    recentDeals: deals.slice(0, 3),
     financials: {
       revenue: wonRevenue,
       expenses: totalExpenses,
@@ -112,25 +194,66 @@ export default async function Home() {
   return (
     <div className="space-y-8">
       
+      {/* 1. HEADER SECTION */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-base-content">
             {greeting}, {user.name.split(' ')[0]}
           </h1>
           <p className="text-base-content/60 mt-1 font-medium">
-            Here's what's happening with your business today.
+             {data.alerts.length > 0 
+              ? "You have a few items in your briefing." 
+              : "You are all caught up. Great work!"}
           </p>
         </div>
-        <div className="flex gap-2">
-           <Link href="/deals" className="btn btn-primary btn-sm gap-2 shadow-lg">
+        
+        <div className="flex gap-2 items-center w-full md:w-auto">
+           <Link href="/deals" className="flex-1 md:flex-none btn btn-primary btn-sm gap-2 shadow-lg shadow-primary/20">
              <PlusIcon className="w-4 h-4" /> New Deal
            </Link>
-           <Link href="/tasks" className="btn btn-neutral btn-sm gap-2">
+           <Link href="/tasks" className="flex-1 md:flex-none btn btn-neutral btn-sm gap-2">
              <PlusIcon className="w-4 h-4" /> New Task
            </Link>
         </div>
       </div>
 
+      {/* 2. SMART BRIEFING (Replaces Floating Alerts) */}
+      {data.alerts.length > 0 && (
+        <div className="bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+           <div className="px-6 py-3 border-b border-base-200 bg-base-200/30 flex justify-between items-center">
+             <h3 className="font-bold text-xs uppercase tracking-widest text-base-content/60 flex items-center gap-2">
+               <BellAlertIcon className="w-4 h-4" /> Morning Briefing
+             </h3>
+             <span className="badge badge-sm badge-neutral">{data.alerts.length} Updates</span>
+           </div>
+           <div className="divide-y divide-base-100">
+             {data.alerts.map((alert) => (
+               <Link href={alert.link} key={alert.id} className="flex items-center gap-4 p-4 hover:bg-base-50 transition-colors group">
+                  <div className={`p-2 rounded-xl shrink-0 ${
+                    alert.type === 'CRITICAL' ? 'bg-error/10 text-error' :
+                    alert.type === 'WARNING' ? 'bg-warning/10 text-warning' :
+                    alert.type === 'INFO' ? 'bg-info/10 text-info' :
+                    'bg-success/10 text-success'
+                  }`}>
+                    <alert.icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                     <div className="flex items-center gap-2 mb-0.5">
+                       <h4 className="font-bold text-sm text-base-content group-hover:text-primary transition-colors truncate">
+                         {alert.message}
+                       </h4>
+                       {alert.type === 'CRITICAL' && <span className="badge badge-xs badge-error animate-pulse"></span>}
+                     </div>
+                     <p className="text-xs text-base-content/60 truncate">{alert.subtext}</p>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-base-content/20 group-hover:text-primary self-center transition-colors" />
+               </Link>
+             ))}
+           </div>
+        </div>
+      )}
+
+      {/* 3. FINANCIAL PULSE */}
       <div className="card bg-base-100 shadow-md border border-base-200">
         <div className="card-body p-6">
           <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
@@ -169,30 +292,9 @@ export default async function Home() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* LEFT COL: Activity & Stale */}
         <div className="lg:col-span-2 space-y-8">
-          {data.urgentTasks.length > 0 ? (
-            <div className="card bg-base-100 shadow-sm border border-error/20 ring-1 ring-error/5">
-              <div className="card-body p-5">
-                <h2 className="text-xs font-bold uppercase text-error flex items-center gap-2 mb-3 tracking-wider">
-                  <ExclamationCircleIcon className="w-4 h-4" /> Urgent Tasks
-                </h2>
-                <div className="space-y-2">
-                  {data.urgentTasks.slice(0, 3).map(task => (
-                    <TaskCard key={task.id} task={task} />
-                  ))}
-                </div>
-                {data.urgentTasks.length > 3 && <Link href="/tasks" className="text-center text-xs text-base-content/50 mt-2">+ {data.urgentTasks.length - 3} more</Link>}
-              </div>
-            </div>
-          ) : (
-            <div className="card bg-base-100 shadow-sm border border-base-200">
-               <div className="card-body p-6 flex flex-row items-center gap-4">
-                  <div className="p-3 bg-success/10 text-success rounded-full"><ClockIcon className="w-6 h-6" /></div>
-                  <div><h3 className="font-bold">All caught up!</h3><p className="text-xs opacity-60">No overdue tasks.</p></div>
-               </div>
-            </div>
-          )}
-
+          
           {/* ACTIVITY FEED */}
           <div>
              <h3 className="font-bold text-lg flex items-center gap-2 px-1 mb-4 text-base-content">
@@ -207,9 +309,10 @@ export default async function Home() {
                    const noteData = isNote ? activity.data as any : null;
                    const expenseData = !isNote ? activity.data as any : null;
                    const linkHref = activity.deal ? `/deals/${activity.deal.id}` : (isNote && noteData.contact ? `/contacts/${noteData.contact.id}` : '#');
-                   
+                   const isClickable = linkHref !== '#';
+
                    return (
-                     <Link key={i} href={linkHref} className={`p-4 flex gap-4 ${linkHref !== '#' ? 'hover:bg-base-50' : ''}`}>
+                     <Link key={i} href={linkHref} className={`p-4 flex gap-4 transition-colors ${isClickable ? 'hover:bg-base-50 cursor-pointer' : 'cursor-default opacity-80'}`}>
                         <div className="mt-1">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isNote ? 'bg-primary/10 text-primary' : 'bg-error/10 text-error'}`}>
                              {isNote ? <ChatBubbleLeftRightIcon className="w-4 h-4" /> : <BanknotesIcon className="w-4 h-4" />}
@@ -229,8 +332,25 @@ export default async function Home() {
                </div>
              )}
           </div>
+
+          {/* STALE DEALS LIST */}
+          {data.staleDeals.length > 0 && (
+             <div className="card bg-base-100 shadow-sm border border-warning/30">
+               <div className="card-body p-5">
+                 <h2 className="text-xs font-bold uppercase text-warning flex items-center gap-2 mb-4 tracking-wider">
+                   <ClockIcon className="w-4 h-4" /> Stalling Deals
+                 </h2>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   {data.staleDeals.map(deal => (
+                     <DealCard key={deal.id} deal={{...deal, contacts: deal.contacts.map(c => ({ id: c.id, name: c.name, imageUrl: c.imageUrl || undefined }))}} />
+                   ))}
+                 </div>
+               </div>
+             </div>
+          )}
         </div>
 
+        {/* RIGHT COL: Insights */}
         <div className="space-y-8">
            <div className="card bg-base-100 shadow-sm border border-base-200">
              <div className="card-body p-5">
@@ -241,7 +361,7 @@ export default async function Home() {
              </div>
            </div>
 
-           {/* RECENTLY ACTIVE CONTACTS (Replaces Manual Hot Leads) */}
+           {/* RECENTLY ACTIVE */}
            <div>
              <div className="flex items-center justify-between px-1 mb-3">
                 <div className="flex items-center gap-2">
@@ -258,25 +378,12 @@ export default async function Home() {
                <div className="flex gap-3 overflow-x-auto pb-4 pt-1 no-scrollbar snap-x">
                  {data.activeContacts.map(contact => (
                     <div key={contact.id} className="snap-start shrink-0">
-                      <ContactCard contact={{...contact, imageUrl: contact.imageUrl, tags: contact.tags.map(t => ({ name: t.name }))}} />
+                      <ContactCard contact={{...contact, tags: contact.tags.map(t => ({ name: t.name }))}} />
                     </div>
                  ))}
                </div>
              )}
            </div>
-           
-           {data.staleDeals.length > 0 && (
-             <div className="card bg-base-100 shadow-sm border border-warning/30">
-               <div className="card-body p-5">
-                 <h2 className="text-xs font-bold uppercase text-warning flex items-center gap-2 mb-4"><ClockIcon className="w-4 h-4" /> Stalling Deals</h2>
-                 <div className="space-y-2">
-                   {data.staleDeals.map(deal => (
-                     <DealCard key={deal.id} deal={{...deal, contacts: deal.contacts.map(c => ({ id: c.id, name: c.name, imageUrl: c.imageUrl || undefined }))}} />
-                   ))}
-                 </div>
-               </div>
-             </div>
-           )}
         </div>
       </div>
     </div>

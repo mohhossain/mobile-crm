@@ -6,7 +6,7 @@ import {
   CheckCircleIcon, 
   TrashIcon, 
   ClockIcon, 
-  PencilSquareIcon, // New Icon
+  PencilSquareIcon, 
   XMarkIcon,
   CheckIcon
 } from "@heroicons/react/24/outline";
@@ -26,13 +26,25 @@ interface TaskProps {
 
 export default function TaskCard({ task }: TaskProps) {
   const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
-  // Edit Form State
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || "");
-  const [editDate, setEditDate] = useState(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "");
+  
+  // Initialize Date & Time from ISO string
+  // Note: We use UTC methods to ensure consistency with how data is saved
+  const [editDate, setEditDate] = useState(() => {
+    if (!task.dueDate) return "";
+    return new Date(task.dueDate).toISOString().split('T')[0];
+  });
+
+  const [editTime, setEditTime] = useState(() => {
+    if (!task.dueDate) return "";
+    // Extract HH:mm part from ISO string
+    return new Date(task.dueDate).toISOString().split('T')[1].substring(0, 5);
+  });
+
   const [editPriority, setEditPriority] = useState(task.priority);
 
   const router = useRouter();
@@ -57,13 +69,21 @@ export default function TaskCard({ task }: TaskProps) {
   const handleSave = async () => {
     setLoading(true);
     try {
+      // Combine Date and Time
+      let finalDate = null;
+      if (editDate) {
+        const timePart = editTime || "00:00"; 
+        // Construct ISO string manually to preserve selected values
+        finalDate = `${editDate}T${timePart}:00.000Z`;
+      }
+
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: editTitle,
           description: editDesc,
-          dueDate: editDate ? new Date(editDate) : null,
+          dueDate: finalDate,
           priority: editPriority
         })
       });
@@ -107,7 +127,6 @@ export default function TaskCard({ task }: TaskProps) {
         
         <div className="card-body p-4 flex flex-row items-start gap-3 relative">
           
-          {/* Checkbox (Hidden when editing) */}
           {!isEditing && (
             <button onClick={toggleStatus} disabled={loading} className="mt-1 text-primary hover:scale-110 transition">
               {task.status === 'DONE' ? <SolidCheck className="w-6 h-6" /> : <CheckCircleIcon className="w-6 h-6" />}
@@ -116,7 +135,6 @@ export default function TaskCard({ task }: TaskProps) {
 
           <div className="flex-1 min-w-0">
              {isEditing ? (
-               // --- EDIT MODE ---
                <div className="flex flex-col gap-2">
                  <input 
                    className="input input-sm input-bordered w-full font-bold" 
@@ -131,15 +149,21 @@ export default function TaskCard({ task }: TaskProps) {
                    placeholder="Description..."
                    rows={2}
                  />
-                 <div className="flex gap-2">
+                 <div className="flex flex-wrap gap-2">
                    <input 
                      type="date" 
-                     className="input input-sm input-bordered flex-1"
+                     className="input input-sm input-bordered flex-grow min-w-[120px]"
                      value={editDate}
                      onChange={(e) => setEditDate(e.target.value)}
                    />
+                   <input 
+                     type="time" 
+                     className="input input-sm input-bordered w-24"
+                     value={editTime}
+                     onChange={(e) => setEditTime(e.target.value)}
+                   />
                    <select 
-                     className="select select-sm select-bordered"
+                     className="select select-sm select-bordered w-full sm:w-auto"
                      value={editPriority}
                      onChange={(e) => setEditPriority(Number(e.target.value))}
                    >
@@ -158,7 +182,6 @@ export default function TaskCard({ task }: TaskProps) {
                  </div>
                </div>
              ) : (
-               // --- VIEW MODE ---
                <>
                  <h3 className={`font-semibold truncate transition-all ${
                    task.status === 'DONE' ? 'line-through decoration-2 text-gray-400' : ''
@@ -176,7 +199,10 @@ export default function TaskCard({ task }: TaskProps) {
                    {task.dueDate && (
                      <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-error font-bold' : 'text-gray-400'}`}>
                        <ClockIcon className="w-3 h-3" />
-                       {new Date(task.dueDate).toLocaleDateString()}
+                       {new Date(task.dueDate).toLocaleDateString()} 
+                       <span className="opacity-50">
+                         {new Date(task.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                       </span>
                      </span>
                    )}
                    {task.deal && (
@@ -187,7 +213,6 @@ export default function TaskCard({ task }: TaskProps) {
              )}
           </div>
 
-          {/* Action Buttons (Hidden when editing) */}
           {!isEditing && (
             <div className="flex flex-col gap-1">
               <button 
@@ -209,7 +234,6 @@ export default function TaskCard({ task }: TaskProps) {
         </div>
       </div>
 
-      {/* Delete Modal */}
       {showDeleteModal && (
         <dialog open className="modal modal-bottom sm:modal-middle bg-black/50">
           <div className="modal-box">

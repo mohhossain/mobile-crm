@@ -25,17 +25,25 @@ export async function GET() {
   }
 }
 
+// Helper to safely parse dates
+const toSafeDate = (dateStr: any): Date | null => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  // Check if date is valid
+  if (isNaN(date.getTime())) return null;
+  return date;
+};
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { title, description, priority, startDate, dueDate, dealId, contactIds } = body;
-
   try {
-    // Safely handle contactIds array (ensure it exists and filters out invalid values)
+    const body = await req.json();
+    const { title, description, priority, startDate, dueDate, dealId, contactIds } = body;
+
     const validContactIds = Array.isArray(contactIds) 
       ? contactIds.filter((id: any) => typeof id === 'string') 
       : [];
@@ -43,12 +51,12 @@ export async function POST(req: Request) {
     const task = await prisma.task.create({
       data: {
         title,
-        description,
+        description: description || "",
         priority: priority ? parseInt(priority, 10) : 1,
-        startDate: startDate ? new Date(startDate) : null,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        // Fix: Use toSafeDate helper
+        startDate: toSafeDate(startDate),
+        dueDate: toSafeDate(dueDate),
         userId: user.id,
-        // Only connect dealId if it's a valid string
         dealId: (typeof dealId === 'string' && dealId.length > 0) ? dealId : null,
         contacts: {
           connect: validContactIds.map((id: string) => ({ id })),

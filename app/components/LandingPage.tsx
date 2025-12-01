@@ -86,7 +86,7 @@ export default function LandingPage() {
           <div className="flex-1 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-base-200 border border-base-content/10 text-xs font-bold mb-6 tracking-wide animate-in fade-in slide-in-from-bottom-4 duration-700 text-base-content">
               <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-              LIVE PREVIEW v1.0
+              BETA v1.1
             </div>
             
             <h1 className="text-5xl lg:text-7xl font-black tracking-tight mb-6 leading-[1.1] text-base-content">
