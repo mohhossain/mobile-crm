@@ -41,44 +41,58 @@ model Gig {
 }
 
 model Contact {
-  id        String     @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  userId    String
-  imageUrl  String?
-  status    LeadStatus @default(NEW)
-  user      User       @relation(fields: [userId], references: [id])
-  gigs      Gig[]      @relation("GigContacts")
-  tags      Tag[]      @relation("ContactTags")
-  createdAt DateTime   @default(now())
-  tasks     Task[]     @relation("_ContactToTask")
-  updatedAt DateTime   @default(now()) @updatedAt
-  deals     Deal[]     @relation("ContactDeals")
-  notes     Note[]
-  meetings  Meeting[]
+  id              String    @id @default(uuid())
+  name            String
+  email           String?
+  phone           String?
+  
+  // Modern Context Fields
+  jobTitle        String?
+  company         String?
+  linkedin        String?
+  location        String?
+  
+  imageUrl        String?   // Restored field
+  
+  lastContactedAt DateTime?
+  
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  
+  tags            Tag[]     @relation("ContactTags")
+  deals           Deal[]    @relation("ContactDeals")
+  tasks           Task[]    @relation("_ContactToTask")
+  notes           Note[]
+  meetings        Meeting[]
+  gigs            Gig[]     @relation("GigContacts")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 }
 
 model Deal {
-  id        String     @id @default(uuid())
-  title     String
-  amount    Float
-  status    DealStatus
-  gigId     String?
-  gig       Gig?       @relation(fields: [gigId], references: [id])
-  createdAt DateTime   @default(now())
-  tasks     Task[]
-  updatedAt DateTime   @default(now()) @updatedAt
-  contacts  Contact[]  @relation("ContactDeals")
-  userId    String
-  user      User       @relation(fields: [userId], references: [id])
-  tags      Tag[]      @relation("TagDeals")
-  closeDate DateTime?
-  notes     Note[]
-  meetings  Meeting[]
-  expenses  Expense[]
+  id          String     @id @default(uuid())
+  title       String
+  amount      Float
+  status      DealStatus
+  probability Int        @default(50) // NEW: Track likelihood to close
+  
+  // ... existing relations
+  gigId       String?
+  gig         Gig?       @relation(fields: [gigId], references: [id])
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  contacts    Contact[]  @relation("ContactDeals")
+  tags        Tag[]      @relation("TagDeals")
+  tasks       Task[]
+  notes       Note[]
+  meetings    Meeting[]
+  expenses    Expense[]
+  
+  closeDate   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
 }
-
 model Service {
   id          String   @id @default(uuid())
   name        String

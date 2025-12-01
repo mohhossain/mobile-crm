@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/currentUser'
 
-// GET: Fetch single contact
+// GET: Fetch Single Contact
 export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -20,7 +20,7 @@ export async function GET(
   return NextResponse.json(contact)
 }
 
-// PUT: Update contact
+// PUT: Update Contact
 export async function PUT(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -30,25 +30,29 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { name, email, phone, status, tags, imageUrl } = body
+  
+  // 1. Destructure new fields to allow updates
+  const { 
+    name, email, phone, tags, imageUrl, 
+    jobTitle, company, location, linkedin 
+  } = body
 
   try {
-    // Handling Tags: Prisma 'set' replaces the entire relationship
-    // logic: first ensure tags exist (connectOrCreate), then set the relationship
-    
-    // We construct the update data object dynamically
     const updateData: any = {
       name,
       email,
       phone,
-      status,
+      // 2. Include new fields in update object
+      jobTitle,
+      company,
+      location,
+      linkedin,
       imageUrl,
     }
 
     if (tags && Array.isArray(tags)) {
-      // Logic: Disconnect all existing, Connect/Create new ones
       updateData.tags = {
-        set: [], // Disconnects current tags
+        set: [],
         connectOrCreate: tags.map((t: string) => ({
           where: { name: t },
           create: { name: t }
@@ -69,20 +73,17 @@ export async function PUT(
   }
 }
 
-// DELETE: Remove contact
+// DELETE: Remove Contact
 export async function DELETE(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { id } = await params
 
   try {
-    await prisma.contact.delete({
-      where: { id, userId: user.id }
-    })
+    await prisma.contact.delete({ where: { id, userId: user.id } })
     return NextResponse.json({ success: true })
   } catch (err) {
     return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 })
