@@ -26,7 +26,7 @@ export default async function Contacts() {
                         key={contact.id}
                         contact={{
                             ...contact,
-                            tags: contact.tags.map((tag: { id: string; name: string }) => tag.name),
+                            tags: contact.tags.map((tag: { id: string; name: string }) => ({ name: tag.name })),
                         }}
                     />
                 ))}
