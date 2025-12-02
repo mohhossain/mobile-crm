@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, TrashIcon, BanknotesIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, BanknotesIcon, CalendarIcon } from "@heroicons/react/24/outline";
 
 import InputTags from "./InputTags";
 import AddLeads from "./AddLeads";
@@ -13,6 +13,7 @@ interface Contact {
   id: string;
   name: string;
   email: string | null;
+  imageUrl?: string | null;
 }
 
 interface ExpenseDraft {
@@ -31,17 +32,14 @@ const AddDeals = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Date & Time State separated for better UX
   const [closeDateDate, setCloseDateDate] = useState("");
   const [closeDateTime, setCloseDateTime] = useState("");
 
   const [contactOptions, setContactOptions] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
-
   const [notes, setNotes] = useState<string[]>([]);
   
-  // Expense State
   const [expenses, setExpenses] = useState<ExpenseDraft[]>([]);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [newExpense, setNewExpense] = useState<ExpenseDraft>({
@@ -64,7 +62,6 @@ const AddDeals = () => {
         console.error("Failed to fetch contacts", err);
       }
     };
-
     fetchContacts();
   }, []);
 
@@ -89,19 +86,16 @@ const AddDeals = () => {
     setError(null);
     setSuccess(false);
 
-    // Construct final ISO string combining date and optional time
     let finalCloseDate = null;
     if (closeDateDate) {
-      const timePart = closeDateTime || "00:00"; // Default to start of day if no time
-      finalCloseDate = new Date(`${closeDateDate}T${timePart}`).toISOString();
+      const timePart = closeDateTime || "17:00"; 
+      finalCloseDate = new Date(`${closeDateDate}T${timePart}:00`).toISOString();
     }
 
     try {
       const response = await fetch("/api/deals", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
           amount: parseFloat(amount),
@@ -117,15 +111,9 @@ const AddDeals = () => {
       if (!response.ok) throw new Error("Failed to add deal");
 
       setSuccess(true);
-      setTitle("");
-      setAmount("");
-      setStatus("OPEN");
-      setTags([]);
-      setSelectedContacts([]);
-      setCloseDateDate("");
-      setCloseDateTime("");
-      setNotes([]);
-      setExpenses([]);
+      setTitle(""); setAmount(""); setStatus("OPEN"); setTags([]);
+      setSelectedContacts([]); setCloseDateDate(""); setCloseDateTime("");
+      setNotes([]); setExpenses([]);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -137,10 +125,10 @@ const AddDeals = () => {
   return (
     <>
       <form
-        className="max-w-3xl mx-auto p-8 rounded-xl shadow-lg border border-base-200 bg-base-100 space-y-8"
+        className="max-w-3xl mx-auto p-6 pb-32 space-y-8"
         onSubmit={handleSubmit}
       >
-        <h2 className="text-3xl font-bold text-center">Create New Deal</h2>
+        <h2 className="text-2xl font-bold text-center">Create New Deal</h2>
         
         {error && <div className="alert alert-error text-sm">{error}</div>}
         {success && <div className="alert alert-success text-sm">Deal added successfully!</div>}
@@ -172,14 +160,9 @@ const AddDeals = () => {
                 className="input input-bordered w-full"
               />
             </div>
-
             <div className="form-control">
               <label className="label font-semibold">Status</label>
-              <select
-                className="select select-bordered w-full"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
+              <select className="select select-bordered w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="OPEN">Open</option>
                 <option value="PENDING">Pending</option>
                 <option value="WON">Won</option>
@@ -189,156 +172,105 @@ const AddDeals = () => {
             </div>
           </div>
 
+          {/* Closing Date */}
           <div className="form-control">
             <label className="label font-semibold">Target Close Date</label>
             <div className="flex gap-2">
-              <input 
-                type="date" 
-                className="input input-bordered w-full flex-grow" 
-                value={closeDateDate}
-                onChange={(e) => setCloseDateDate(e.target.value)}
-              />
-              <input 
-                type="time" 
-                className="input input-bordered w-32 shrink-0" 
-                value={closeDateTime}
-                onChange={(e) => setCloseDateTime(e.target.value)}
-              />
+              <input type="date" className="input input-bordered w-full flex-grow" value={closeDateDate} onChange={(e) => setCloseDateDate(e.target.value)} />
+              <input type="time" className="input input-bordered w-32 shrink-0" value={closeDateTime} onChange={(e) => setCloseDateTime(e.target.value)} />
             </div>
-            <label className="label">
-              <span className="label-text-alt text-gray-500">Time is optional (Defaults to 12:00 AM)</span>
-            </label>
+            <label className="label"><span className="label-text-alt text-gray-500">Time is optional</span></label>
           </div>
 
-          {/* Contacts */}
           <div className="form-control">
             <ContactMultiSelect
               contacts={contactOptions}
               selected={selectedContacts}
               onChange={(newSelected) => setSelectedContacts(newSelected)}
             />
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm mt-2 self-start"
-              onClick={() => setShowAddContactModal(true)}
-            >
-              + Create New Contact
-            </button>
+            <button type="button" className="btn btn-ghost btn-sm mt-2 self-start" onClick={() => setShowAddContactModal(true)}>+ Create New Contact</button>
           </div>
 
-          {/* EXPENSES SECTION */}
+          {/* EXPENSES SECTION - REDESIGNED */}
           <div className="bg-base-200/50 p-6 rounded-xl border border-base-300">
             <div className="flex justify-between items-center mb-4">
               <label className="label font-semibold py-0 flex items-center gap-2 text-lg">
                 <BanknotesIcon className="w-5 h-5" /> Initial Expenses
               </label>
-              <button 
-                type="button" 
-                onClick={() => setShowExpenseForm(!showExpenseForm)}
-                className="btn btn-sm btn-ghost"
-              >
-                {showExpenseForm ? "Hide" : "+ Add Expense"}
-              </button>
+              <button type="button" onClick={() => setShowExpenseForm(!showExpenseForm)} className="btn btn-sm btn-ghost">{showExpenseForm ? "Hide" : "+ Add Expense"}</button>
             </div>
-
-            {/* List of added expenses */}
             {expenses.length > 0 && (
               <div className="space-y-3 mb-4">
                 {expenses.map((exp, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-sm bg-base-100 p-3 rounded-lg border border-base-200 shadow-sm">
-                    <span className="font-medium">{exp.description} <span className="opacity-50 text-xs font-normal ml-1">({exp.category})</span></span>
-                    <div className="flex items-center gap-3">
+                  <div key={idx} className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm bg-base-100 p-3 rounded-lg border border-base-200 shadow-sm gap-2">
+                    <div>
+                       <span className="font-medium block sm:inline">{exp.description}</span>
+                       <span className="text-xs opacity-60 sm:ml-2 block sm:inline">{exp.category} • {new Date(exp.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0">
                       <span className="text-error font-mono font-bold">-${exp.amount}</span>
-                      <button type="button" onClick={() => handleRemoveExpense(idx)} className="btn btn-ghost btn-xs btn-square text-gray-400 hover:text-error">
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                      <button type="button" onClick={() => handleRemoveExpense(idx)} className="btn btn-ghost btn-xs btn-square text-gray-400 hover:text-error"><TrashIcon className="w-4 h-4" /></button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-
-            {/* Add Expense Mini-Form */}
             {showExpenseForm && (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 animate-in fade-in slide-in-from-top-2 bg-base-100 p-4 rounded-lg border border-base-200">
-                <div className="md:col-span-5">
-                  <input 
-                    placeholder="Description (e.g. Server Cost)" 
-                    className="input input-sm input-bordered w-full"
-                    value={newExpense.description}
-                    onChange={e => setNewExpense({...newExpense, description: e.target.value})}
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 animate-in fade-in slide-in-from-top-2 bg-base-100 p-4 rounded-lg border border-base-200">
+                {/* Description */}
+                <div className="sm:col-span-4">
+                   <input placeholder="Description" className="input input-sm input-bordered w-full" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} />
                 </div>
-                <div className="md:col-span-3">
-                  <input 
-                    type="number" 
-                    placeholder="Amount ($)" 
-                    className="input input-sm input-bordered w-full"
-                    value={newExpense.amount}
-                    onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
-                  />
+                {/* Amount */}
+                <div className="sm:col-span-2">
+                   <input type="number" placeholder="$" className="input input-sm input-bordered w-full" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} />
                 </div>
-                <div className="md:col-span-3">
-                  <select 
-                    className="select select-sm select-bordered w-full"
-                    value={newExpense.category}
-                    onChange={e => setNewExpense({...newExpense, category: e.target.value})}
-                  >
-                    <option value="OTHER">Other</option>
-                    <option value="LABOR">Labor</option>
-                    <option value="SOFTWARE">Software</option>
-                    <option value="MATERIAL">Material</option>
-                  </select>
+                 {/* Category */}
+                <div className="sm:col-span-3">
+                   <select className="select select-sm select-bordered w-full" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})}>
+                      <option value="OTHER">Other</option><option value="LABOR">Labor</option><option value="SOFTWARE">Software</option><option value="MATERIAL">Material</option>
+                   </select>
                 </div>
-                <div className="md:col-span-1">
-                  <button type="button" onClick={handleAddExpense} className="btn btn-sm btn-primary w-full">
-                    <PlusIcon className="w-5 h-5" />
-                  </button>
+                {/* Date */}
+                <div className="sm:col-span-2">
+                    <input type="date" className="input input-sm input-bordered w-full" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} />
+                </div>
+                {/* Add Button */}
+                <div className="sm:col-span-1">
+                  <button type="button" onClick={handleAddExpense} className="btn btn-sm btn-primary w-full px-0"><PlusIcon className="w-5 h-5 mx-auto" /></button>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <AddNotes
-               notes={notes}
-               onNotesInput={(n) => setNotes(n)}
-             />
-             <div className="flex flex-col justify-center">
-                <label className="label font-semibold self-center">Tags</label>
-                <div className="flex justify-center">
-                  <InputTags tags={tags} onTagsInput={setTags} />
-                </div>
+          <div className="flex flex-col gap-6">
+             <div className="w-full">
+               <AddNotes notes={notes} onNotesInput={(n) => setNotes(n)} />
+             </div>
+             <div className="w-full flex flex-col">
+                <label className="label font-semibold">Tags</label>
+                <InputTags tags={tags} onTagsInput={setTags} />
              </div>
           </div>
 
           <div className="pt-4">
-            <button
-              type="submit"
-              className={`btn btn-primary w-full btn-lg ${loading ? "loading" : ""}`}
-              disabled={loading}
-            >
+            <button type="submit" className={`btn btn-primary w-full btn-lg ${loading ? "loading" : ""}`} disabled={loading}>
               {loading ? "Creating Deal..." : "Create Deal"}
             </button>
           </div>
         </div>
       </form>
 
-      {/* MODAL TO ADD CONTACT */}
+      {/* MODAL */}
       {showAddContactModal && (
         <dialog open className="modal">
           <div className="modal-box relative">
-            <button
-              onClick={() => setShowAddContactModal(false)}
-              className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-            >
-              ✕
-            </button>
+            <button onClick={() => setShowAddContactModal(false)} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
             <h3 className="text-lg font-bold mb-2">Create New Contact</h3>
-            <AddLeads
-              onSuccess={(newContact) => {
-                setContactOptions((prev) => [...prev, newContact]);
-                setSelectedContacts((prev) => [...prev, newContact]);
+            <AddLeads onSuccess={(newContact) => {
+                const c: Contact = { id: newContact.id, name: newContact.name, email: newContact.email, imageUrl: newContact.imageUrl };
+                setContactOptions((prev) => [...prev, c]);
+                setSelectedContacts((prev) => [...prev, c]);
                 setShowAddContactModal(false);
               }}
             />

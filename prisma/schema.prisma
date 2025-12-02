@@ -201,6 +201,7 @@ enum DealStatus {
   LOST
   CANCELLED
   NEGOTIATION
+  OPEN
 }
 
 enum LeadStatus {

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/currentUser'
 
+const toSafeDate = (dateStr: any): Date | null => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
+  return date;
+};
+
 export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -17,7 +24,7 @@ export async function GET(
       contacts: true,
       tasks: { orderBy: { dueDate: 'asc' }, include: { deal: true } },
       notes: { orderBy: { createdAt: 'desc' } },
-      expenses: { orderBy: { date: 'desc' } }
+      expenses: { orderBy: { date: 'desc' } } // Ensure expenses are included
     }
   })
   
@@ -43,11 +50,11 @@ export async function PUT(
         title,
         amount,
         status,
-        probability, // NEW field
-        closeDate: closeDate ? new Date(closeDate) : null,
+        probability,
+        ...(closeDate !== undefined && { closeDate: toSafeDate(closeDate) }),
         ...(contactIds && {
           contacts: {
-            set: [], // Reset and re-link
+            set: [], 
             connect: contactIds.map((cid: string) => ({ id: cid }))
           }
         })

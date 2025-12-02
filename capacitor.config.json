@@ -1,0 +1,14 @@
+{
+  "appId": "com.pulse.crm",
+  "appName": "Pulse",
+  "webDir": "out",
+  "server": {
+    "url": "https://pulsesmartcrm.vercel.app",
+    "cleartext": true,
+    "allowNavigation": [
+      "pulsesmartcrm.vercel.app",
+      "*.clerk.accounts.dev", 
+      "*.clerk.com"
+    ]
+  }
+}

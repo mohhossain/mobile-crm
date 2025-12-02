@@ -3,17 +3,14 @@
 @plugin "daisyui";
 
 @layer utilities {
-  /* Hide scrollbar for Chrome, Safari and Opera */
+  /* ... existing scrollbar utilities ... */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  /* Hide scrollbar for IE, Edge and Firefox */
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
-
-  /* Sleek Custom Scrollbar */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -29,25 +26,44 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     opacity: 0.3;
   }
+
+  /* SAFE AREA UTILITIES */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .min-h-safe {
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  
+  /* Fix for DealsSearch to position correctly under status bar */
+  .top-safe {
+    top: env(safe-area-inset-top);
+  }
 }
 
 /* GLOBAL RESET */
 html, body {
   height: 100%;
   width: 100%;
-  overflow-x: hidden; /* Prevent horizontal scroll */
-  background-color: var(--color-base-300); /* Fixes the 'extra real background' issue */
+  overflow-x: hidden;
+  background-color: var(--color-base-300);
+  /* Ensure the status bar background matches the header */
+  background-attachment: fixed; 
 }
 
-/* DaisyUI Themes Configuration */
+/* ... DaisyUI Themes Configuration (Keep existing themes) ... */
 @plugin "daisyui/theme" {
   name: "halloween";
   default: false;
   prefersdark: false;
   color-scheme: "dark";
+  /* ... keep existing vars ... */
   --color-base-100: oklch(21% 0.006 56.043);
   --color-base-200: oklch(14% 0.004 49.25);
-  --color-base-300: oklch(10% 0.004 49.25); /* Darker base for better contrast */
+  --color-base-300: oklch(10% 0.004 49.25);
   --color-base-content: oklch(84.955% 0 0);
   --color-primary: oklch(77.48% 0.204 60.62);
   --color-primary-content: oklch(19.693% 0.004 196.779);
@@ -80,6 +96,7 @@ html, body {
   default: false;
   prefersdark: false;
   color-scheme: "light";
+  /* ... keep existing vars ... */
   --color-base-100: oklch(97.788% 0.004 56.375);
   --color-base-200: oklch(93.982% 0.007 61.449);
   --color-base-300: oklch(91.586% 0.006 53.44);
@@ -114,4 +131,6 @@ body {
   @apply font-sans text-base text-base-content bg-base-300;
   font-family: "Inter", sans-serif;
   color: var(--color-base-content);
+  /* Safe area padding for the whole body mostly handles the top status bar overlap */
+  padding-top: env(safe-area-inset-top);
 }

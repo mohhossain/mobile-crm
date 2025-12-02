@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PlusIcon, CalendarIcon } from "@heroicons/react/24/solid";
 
-export default function QuickTaskForm({ dealId }: { dealId: string }) {
+// Add onSuccess prop to pass data back
+export default function QuickTaskForm({ dealId, onSuccess }: { dealId: string, onSuccess?: (task: any) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState(""); // New separate time state
+  const [time, setTime] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -18,10 +19,9 @@ export default function QuickTaskForm({ dealId }: { dealId: string }) {
     
     setLoading(true);
 
-    // Combine date and time if date is present
     let finalDueDate = null;
     if (date) {
-      const timePart = time || "09:00"; // Default tasks to 9 AM if no time set
+      const timePart = time || "09:00";
       finalDueDate = new Date(`${date}T${timePart}`).toISOString();
     }
 
@@ -33,15 +33,21 @@ export default function QuickTaskForm({ dealId }: { dealId: string }) {
           title,
           dueDate: finalDueDate,
           dealId,
-          priority: 2 // Default medium
+          priority: 2 
         })
       });
 
       if (res.ok) {
+        const newTask = await res.json(); // Get the created task
+        
         setTitle("");
         setDate("");
         setTime("");
         setIsOpen(false);
+        
+        // Trigger callback to update parent state immediately
+        if (onSuccess) onSuccess(newTask);
+        
         router.refresh();
       }
     } catch (e) {

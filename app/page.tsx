@@ -39,41 +39,59 @@ async function getSmartDashboardData(userId: string) {
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
   const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
-  const [deals, tasks, contacts, rawNotes, rawExpenses, expenseStats] = await Promise.all([
+  // Helper to safely run queries without crashing the whole dashboard
+  const safeAggregate = async () => {
+    try {
+      const result = await prisma.expense.aggregate({
+        where: { userId },
+        _sum: { amount: true }
+      });
+      return result._sum.amount || 0;
+    } catch (e) {
+      console.error("Expense aggregation failed:", e);
+      return 0;
+    }
+  };
+
+  const [deals, tasks, contacts, rawNotes, rawExpenses, totalExpenses] = await Promise.all([
+    // 1. Deals: Fixed include structure (removed conflicting selects)
     prisma.deal.findMany({
       where: { userId },
       include: { 
         tags: true, 
-        contacts: { select: { id: true, name: true, imageUrl: true } } 
+        contacts: true // Fetch full contact objects to avoid missing fields
       },
       orderBy: { updatedAt: 'desc' }
     }),
+    // 2. Tasks
     prisma.task.findMany({
       where: { userId, status: { not: 'DONE' } },
       include: { deal: true },
       orderBy: { dueDate: 'asc' }
     }),
+    // 3. Contacts: Query by lastContactedAt instead of 'status'
     prisma.contact.findMany({
       where: { userId },
       include: { tags: true },
-      orderBy: { lastContactedAt: 'desc' }
+      orderBy: { lastContactedAt: 'desc' },
+      take: 10 // Limit to 10 for efficiency
     }),
+    // 4. Notes
     prisma.note.findMany({
       where: { userId },
       take: 20, 
       orderBy: { createdAt: 'desc' },
       include: { deal: true, contact: true }
     }),
+    // 5. Expenses
     prisma.expense.findMany({
       where: { userId },
       take: 20,
       orderBy: { createdAt: 'desc' },
       include: { deal: true }
     }),
-    prisma.expense.aggregate({
-      where: { userId },
-      _sum: { amount: true }
-    })
+    // 6. Safe Aggregation
+    safeAggregate()
   ]);
 
   // --- 1. GENERATE SMART ALERTS ---
@@ -87,7 +105,7 @@ async function getSmartDashboardData(userId: string) {
       type: 'CRITICAL',
       message: `You have ${overdueTasks.length} overdue tasks.`,
       subtext: "These items missed their deadline.",
-      link: '/tasks?filter=active', // Updated link to active filter
+      link: '/tasks?filter=active', 
       icon: ExclamationCircleIcon
     });
   }
@@ -160,11 +178,11 @@ async function getSmartDashboardData(userId: string) {
 
   // --- 3. FINANCIALS ---
   const wonRevenue = deals.filter(d => d.status === 'WON').reduce((sum, d) => sum + d.amount, 0);
-  const totalExpenses = expenseStats._sum.amount || 0;
   const netProfit = wonRevenue - totalExpenses;
   const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING', 'OPEN'].includes(d.status));
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
 
+  // Active contacts (last 7 days)
   const activeContacts = contacts.filter(c => c.lastContactedAt && new Date(c.lastContactedAt) >= sevenDaysAgo).slice(0, 10);
 
   return {
@@ -188,8 +206,20 @@ export default async function Home() {
   if (!user) return <div className="p-8 text-center text-gray-500">Please sign in to access your smart dashboard.</div>;
 
   const data = await getSmartDashboardData(user.id);
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  // Helper for Alert Styling
+  const getAlertStyle = (type: AlertType) => {
+    switch (type) {
+      case 'CRITICAL': return 'text-error';
+      case 'WARNING': return 'text-warning';
+      case 'INFO': return 'text-info';
+      case 'SUCCESS': return 'text-success';
+      default: return 'text-base-content';
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -201,8 +231,8 @@ export default async function Home() {
             {greeting}, {user.name.split(' ')[0]}
           </h1>
           <p className="text-base-content/60 mt-1 font-medium">
-             {data.alerts.length > 0 
-              ? "You have a few items in your briefing." 
+            {data.alerts.length > 0 
+              ? `You have ${data.alerts.length} items needing attention.` 
               : "You are all caught up. Great work!"}
           </p>
         </div>
@@ -217,7 +247,7 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* 2. SMART BRIEFING (Replaces Floating Alerts) */}
+      {/* 2. SMART BRIEFING */}
       {data.alerts.length > 0 && (
         <div className="bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
            <div className="px-6 py-3 border-b border-base-200 bg-base-200/30 flex justify-between items-center">

@@ -4,8 +4,6 @@ import React from "react";
 import Link from "next/link";
 import { 
   CalendarDaysIcon, 
-  UserIcon,
-  ArrowTrendingUpIcon
 } from "@heroicons/react/24/outline";
 
 interface Contact {
@@ -24,14 +22,14 @@ interface Deal {
   title: string;
   amount: number;
   status: string;
-  probability?: number; // Optional in case older deals don't have it
+  probability?: number;
   updatedAt: Date | string;
+  closeDate?: Date | string | null; // Added closeDate
   contacts: Contact[];
   tags: Tag[];
 }
 
 export default function DealCard({ deal }: { deal: Deal }) {
-  // Safety check for probability
   const probability = deal.probability ?? (
     deal.status === 'WON' ? 100 : 
     deal.status === 'LOST' ? 0 : 
@@ -48,6 +46,10 @@ export default function DealCard({ deal }: { deal: Deal }) {
   };
 
   const themeColor = statusColors[deal.status] || 'border-base-content/10';
+  
+  // Date Logic
+  const displayDate = deal.closeDate ? new Date(deal.closeDate) : new Date(deal.updatedAt);
+  const dateLabel = deal.closeDate ? (deal.status === 'WON' ? 'Closed' : 'Target') : 'Updated';
 
   return (
     <Link href={`/deals/${deal.id}`} className="block group">
@@ -61,7 +63,7 @@ export default function DealCard({ deal }: { deal: Deal }) {
             </div>
             <span className="text-[10px] text-base-content/40 font-mono flex items-center gap-1">
               <CalendarDaysIcon className="w-3 h-3" />
-              {new Date(deal.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              {dateLabel}: {displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </span>
           </div>
 
@@ -94,8 +96,6 @@ export default function DealCard({ deal }: { deal: Deal }) {
 
           {/* Footer: Contacts & Tags */}
           <div className="flex justify-between items-end mt-4 pt-4 border-t border-base-100">
-            
-            {/* Avatar Stack */}
             <div className="flex -space-x-2 overflow-hidden p-1">
               {deal.contacts.length > 0 ? (
                 deal.contacts.slice(0, 3).map((contact) => (
@@ -112,16 +112,7 @@ export default function DealCard({ deal }: { deal: Deal }) {
               ) : (
                 <div className="text-[10px] text-base-content/30 italic pl-1">No contacts</div>
               )}
-              {deal.contacts.length > 3 && (
-                <div className="avatar placeholder ring-2 ring-base-100 rounded-full">
-                   <div className="w-6 h-6 bg-base-200 text-[10px] text-base-content/60">
-                     +{deal.contacts.length - 3}
-                   </div>
-                </div>
-              )}
             </div>
-
-            {/* First Tag */}
             {deal.tags.length > 0 && (
               <span className="badge badge-xs badge-outline text-base-content/50">
                 {deal.tags[0].name}
