@@ -2,9 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { 
-  CalendarDaysIcon, 
-} from "@heroicons/react/24/outline";
+import { CalendarDaysIcon } from "@heroicons/react/24/outline";
 
 interface Contact {
   id: string;
@@ -24,103 +22,78 @@ interface Deal {
   status: string;
   probability?: number;
   updatedAt: Date | string;
-  closeDate?: Date | string | null; // Added closeDate
+  closeDate?: Date | string | null;
   contacts: Contact[];
   tags: Tag[];
 }
 
 export default function DealCard({ deal }: { deal: Deal }) {
   const probability = deal.probability ?? (
-    deal.status === 'WON' ? 100 : 
-    deal.status === 'LOST' ? 0 : 
-    deal.status === 'NEGOTIATION' ? 75 : 
-    deal.status === 'PENDING' ? 50 : 10
+    deal.status === 'WON' ? 100 : deal.status === 'LOST' ? 0 : 50
   );
 
   const statusColors: Record<string, string> = {
-    WON: 'border-success bg-success/5 text-success',
-    LOST: 'border-error bg-error/5 text-error',
-    NEGOTIATION: 'border-info bg-info/5 text-info',
-    PENDING: 'border-warning bg-warning/5 text-warning',
-    OPEN: 'border-primary bg-primary/5 text-primary'
+    WON: 'bg-success',
+    LOST: 'bg-error',
+    NEGOTIATION: 'bg-info',
+    PENDING: 'bg-warning',
+    OPEN: 'bg-primary'
   };
 
-  const themeColor = statusColors[deal.status] || 'border-base-content/10';
+  const barColor = statusColors[deal.status] || 'bg-base-content/20';
   
   // Date Logic
   const displayDate = deal.closeDate ? new Date(deal.closeDate) : new Date(deal.updatedAt);
-  const dateLabel = deal.closeDate ? (deal.status === 'WON' ? 'Closed' : 'Target') : 'Updated';
+  const dateLabel = deal.closeDate ? (deal.status === 'WON' ? 'Closed' : 'Due') : 'Updated';
 
   return (
-    <Link href={`/deals/${deal.id}`} className="block group">
-      <div className={`card bg-base-100 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 ${themeColor.split(' ')[0]} border-t border-r border-b border-base-200`}>
-        <div className="card-body p-5">
-          
-          {/* Header */}
-          <div className="flex justify-between items-start mb-2">
-            <div className="badge badge-ghost badge-sm font-bold tracking-wide opacity-70">
-              {deal.status}
-            </div>
-            <span className="text-[10px] text-base-content/40 font-mono flex items-center gap-1">
-              <CalendarDaysIcon className="w-3 h-3" />
-              {dateLabel}: {displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-
-          {/* Title & Amount */}
-          <div>
-            <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-1" title={deal.title}>
-              {deal.title}
-            </h3>
-            <div className="text-2xl font-black mt-1 text-base-content">
-              ${deal.amount.toLocaleString()}
-            </div>
-          </div>
-
-          {/* Probability Bar */}
-          <div className="mt-4">
-            <div className="flex justify-between text-[10px] font-bold uppercase text-base-content/40 mb-1">
-              <span>Probability</span>
-              <span>{probability}%</span>
-            </div>
-            <div className="h-1.5 w-full bg-base-200 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full ${
-                  deal.status === 'WON' ? 'bg-success' : 
-                  deal.status === 'LOST' ? 'bg-error' : 'bg-primary'
-                }`} 
-                style={{ width: `${probability}%` }}
-              ></div>
-            </div>
-          </div>
-
-          {/* Footer: Contacts & Tags */}
-          <div className="flex justify-between items-end mt-4 pt-4 border-t border-base-100">
-            <div className="flex -space-x-2 overflow-hidden p-1">
-              {deal.contacts.length > 0 ? (
-                deal.contacts.slice(0, 3).map((contact) => (
-                  <div key={contact.id} className="avatar placeholder ring-2 ring-base-100 rounded-full" title={contact.name}>
-                    <div className="bg-neutral text-neutral-content rounded-full w-6 h-6 text-xs">
-                      {contact.imageUrl ? (
-                        <img src={contact.imageUrl} alt={contact.name} />
-                      ) : (
-                        <span>{contact.name.charAt(0)}</span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-[10px] text-base-content/30 italic pl-1">No contacts</div>
-              )}
-            </div>
-            {deal.tags.length > 0 && (
-              <span className="badge badge-xs badge-outline text-base-content/50">
-                {deal.tags[0].name}
-              </span>
-            )}
-          </div>
-
+    <Link href={`/deals/${deal.id}`} className="block group relative overflow-hidden rounded-xl bg-base-100 border border-base-200 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+      <div className="p-4">
+        {/* Top Row: Title & Amount */}
+        <div className="flex justify-between items-start gap-4 mb-2">
+           <div className="min-w-0 flex-1">
+             <div className="flex items-center gap-2 mb-0.5">
+               <span className={`w-2 h-2 rounded-full ${barColor}`}></span>
+               <span className="text-[10px] font-bold uppercase tracking-wider opacity-50">{deal.status}</span>
+             </div>
+             <h3 className="font-bold text-base truncate leading-tight group-hover:text-primary transition-colors">
+               {deal.title}
+             </h3>
+           </div>
+           <div className="font-black text-lg tracking-tight">
+             ${deal.amount.toLocaleString()}
+           </div>
         </div>
+
+        {/* Bottom Row: Details */}
+        <div className="flex justify-between items-end mt-2">
+           <div className="flex -space-x-2 overflow-hidden">
+              {deal.contacts.slice(0, 3).map((contact) => (
+                <div key={contact.id} className="avatar placeholder ring-1 ring-base-100 rounded-full w-6 h-6" title={contact.name}>
+                  {contact.imageUrl ? (
+                    <img src={contact.imageUrl} alt={contact.name} />
+                  ) : (
+                    <div className="bg-neutral text-neutral-content w-full h-full flex items-center justify-center text-[9px] font-bold">
+                      {contact.name.charAt(0)}
+                    </div>
+                  )}
+                </div>
+              ))}
+           </div>
+           
+           <div className="text-[10px] text-base-content/40 font-medium flex items-center gap-1 bg-base-200/50 px-2 py-1 rounded-md">
+              <CalendarDaysIcon className="w-3 h-3" />
+              {dateLabel} {displayDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+           </div>
+        </div>
+      </div>
+
+      {/* Slim Progress Bar at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-base-200">
+        <div 
+          className={`h-full ${barColor} transition-all duration-500`} 
+          style={{ width: `${probability}%` }}
+        ></div>
       </div>
     </Link>
   );

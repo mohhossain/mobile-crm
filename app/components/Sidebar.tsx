@@ -8,14 +8,16 @@ import {
   UserGroupIcon, 
   BriefcaseIcon,
   Cog6ToothIcon,
-  PlusIcon
+  PlusIcon,
+  BanknotesIcon
 } from "@heroicons/react/24/outline";
 import { 
   HomeIcon as HomeSolid, 
   ClipboardDocumentCheckIcon as TaskSolid, 
   UserGroupIcon as UserSolid, 
   BriefcaseIcon as DealSolid,
-  Cog6ToothIcon as CogSolid
+  Cog6ToothIcon as CogSolid,
+  BanknotesIcon as BanknotesSolid
 } from "@heroicons/react/24/solid";
 
 export default function Sidebar() {
@@ -29,17 +31,16 @@ export default function Sidebar() {
 
   const navItems = [
     { name: "Overview", path: "/", icon: HomeIcon, activeIcon: HomeSolid },
-    { name: "Contacts", path: "/contacts", icon: UserGroupIcon, activeIcon: UserSolid },
     { name: "Pipeline", path: "/deals", icon: BriefcaseIcon, activeIcon: DealSolid },
+    { name: "Finance", path: "/finance", icon: BanknotesIcon, activeIcon: BanknotesSolid }, // Added
     { name: "Tasks", path: "/tasks", icon: ClipboardDocumentCheckIcon, activeIcon: TaskSolid },
+    { name: "Contacts", path: "/contacts", icon: UserGroupIcon, activeIcon: UserSolid },
     { name: "Settings", path: "/settings", icon: Cog6ToothIcon, activeIcon: CogSolid },
   ];
 
-  // Only render on Desktop (lg and up)
   return (
     <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 border-r border-base-200 bg-base-100/50 backdrop-blur-xl">
       
-      {/* Logo Area */}
       <div className="p-6 flex items-center gap-3">
         <div className="w-8 h-8 bg-primary rounded-lg shadow-lg shadow-primary/20 flex items-center justify-center">
            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
@@ -47,7 +48,6 @@ export default function Sidebar() {
         <span className="font-black text-xl tracking-tight">Pulse</span>
       </div>
 
-      {/* Navigation Links */}
       <nav className="flex-1 px-4 space-y-2 py-4">
         {navItems.map((item) => {
           const active = isActive(item.path);
@@ -72,7 +72,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom Actions */}
       <div className="p-4 border-t border-base-200">
          <div className="bg-base-200/50 rounded-xl p-4">
             <h4 className="text-xs font-bold uppercase text-base-content/40 mb-2">Quick Actions</h4>
