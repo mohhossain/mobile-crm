@@ -19,14 +19,13 @@ interface AddLeadsProps {
 }
 
 const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
-  // Basic Info
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   
   // Context Info
   const [jobTitle, setJobTitle] = useState("");
-  const [company, setCompany] = useState("");
+  const [company, setCompany] = useState(""); // This string will be sent to API to create/link Company
   const [location, setLocation] = useState("");
   
   const [tags, setTags] = useState<string[]>([]);
@@ -51,7 +50,6 @@ const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
     try {
       let imageUrl = null;
 
-      // Upload image first if exists
       if (image) {
         const formData = new FormData();
         formData.append("image", image);
@@ -75,7 +73,6 @@ const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
 
       const data = await response.json();
       
-      // Reset
       setName(""); setEmail(""); setPhone("");
       setJobTitle(""); setCompany(""); setLocation("");
       setTags([]); setImage(null); setImagePreview(null);

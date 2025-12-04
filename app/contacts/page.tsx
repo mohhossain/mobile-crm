@@ -18,27 +18,25 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
          OR: [
            { name: { contains: q, mode: 'insensitive' } },
            { email: { contains: q, mode: 'insensitive' } },
-           // FIX: Search legacy string field
+           // FIX 1: Search the legacy string field (if you kept it)
            { companyName: { contains: q, mode: 'insensitive' } },
-           // FIX: Search relation field safely
+           // FIX 2: Search the relation correctly (nested name check)
            { company: { name: { contains: q, mode: 'insensitive' } } }
          ]
        } : {})
      },
      include: { 
        tags: true,
-       company: true // Include the company relation data
+       company: true // Include the relation so we can display the name
      },
      orderBy: { createdAt: 'desc' }
   });
 
-  // FIX: Transform data to match the client component's expected interface.
-  // The Client Component expects 'company' to be a string, not an object.
+  // Transform data for the client component
   const formattedContacts = contacts.map(contact => ({
     ...contact,
-    // Flatten company info: Use the relation name if it exists, otherwise legacy string
+    // Flatten: Use the relation name if available, fallback to legacy string
     company: contact.company?.name || contact.companyName || null,
-    // Ensure tags are mapped correctly if needed (though Prisma returns the right shape mostly)
     tags: contact.tags.map(t => ({ id: t.id, name: t.name }))
   }));
 
@@ -68,7 +66,6 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
        </div>
 
        {/* Interactive List Manager */}
-       {/* We pass the formatted contacts that have 'company' as a string */}
        <ContactList initialContacts={formattedContacts} />
     </div>
   );
