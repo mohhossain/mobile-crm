@@ -16,6 +16,8 @@ model User {
   googleRefreshToken String?
   gigs               Gig[]
   contacts           Contact[]
+  companies          Company[]
+  products           Product[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @default(now()) @updatedAt
   Task               Task[]
@@ -40,24 +42,42 @@ model Gig {
   services    Service[] @relation("GigServices")
 }
 
+model Company {
+  id        String    @id @default(uuid())
+  name      String
+  website   String?
+  logo      String?
+  domain    String?
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  
+  contacts  Contact[]
+  deals     Deal[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
 model Contact {
   id              String    @id @default(uuid())
   name            String
   email           String?
   phone           String?
   
-  // Modern Context Fields
   jobTitle        String?
-  company         String?
+  companyName     String?
   linkedin        String?
   location        String?
   
-  imageUrl        String?   // Restored field
-  
+  imageUrl        String?
   lastContactedAt DateTime?
   
   userId          String
   user            User      @relation(fields: [userId], references: [id])
+  
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id])
   
   tags            Tag[]     @relation("ContactTags")
   deals           Deal[]    @relation("ContactDeals")
@@ -70,20 +90,59 @@ model Contact {
   updatedAt       DateTime  @default(now()) @updatedAt
 }
 
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  unitPrice   Float
+  sku         String?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  lineItems   DealLineItem[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DealLineItem {
+  id          String   @id @default(uuid())
+  quantity    Int      @default(1)
+  price       Float
+  name        String
+  
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
 model Deal {
   id          String     @id @default(uuid())
   title       String
   amount      Float
   status      DealStatus
-  probability Int        @default(50) // NEW: Track likelihood to close
+  probability Int        @default(50)
   
-  // ... existing relations
   gigId       String?
   gig         Gig?       @relation(fields: [gigId], references: [id])
+  
   userId      String
   user        User       @relation(fields: [userId], references: [id])
+  
   contacts    Contact[]  @relation("ContactDeals")
+  
+  companyId   String?
+  company     Company?   @relation(fields: [companyId], references: [id])
+
+  lineItems   DealLineItem[]
+  
   tags        Tag[]      @relation("TagDeals")
+  
+  // FIX: Removed @relation(onDelete: Cascade) from these parent fields.
+  // The cascade logic is correctly defined on the child models (Task, Note, etc.) below.
   tasks       Task[]
   notes       Note[]
   meetings    Meeting[]
@@ -93,6 +152,7 @@ model Deal {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @default(now()) @updatedAt
 }
+
 model Service {
   id          String   @id @default(uuid())
   name        String
