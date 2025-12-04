@@ -2,11 +2,17 @@ import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { 
+  PlusIcon, 
   ExclamationCircleIcon,
   ClockIcon,
-  UserIcon,
-  CalendarDaysIcon,
+  FireIcon,
+  ChatBubbleLeftRightIcon,
   ChartBarIcon,
+  BellAlertIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  UserIcon,
+  ChevronRightIcon
 } from "@heroicons/react/24/solid";
 import ContactCard from "./components/Contact";
 import DealCard from "./components/DealCard";
@@ -47,7 +53,7 @@ async function getSmartDashboardData(userId: string) {
     }
   };
 
-  const [deals, tasks, contacts, rawNotes, rawExpenses, totalExpenses] = await Promise.all([
+  const [deals, tasks, rawContacts, rawNotes, rawExpenses, expenseTotal] = await Promise.all([
     prisma.deal.findMany({
       where: { userId },
       include: { 
@@ -61,11 +67,14 @@ async function getSmartDashboardData(userId: string) {
       include: { deal: true },
       orderBy: { dueDate: 'asc' }
     }),
+    // FIX: Include company relation to access the name
     prisma.contact.findMany({
       where: { userId },
-      include: { tags: true, company: true },
-      orderBy: { lastContactedAt: 'desc' },
-      take: 10
+      include: { 
+        tags: true,
+        company: true 
+      },
+      orderBy: { lastContactedAt: 'desc' }
     }),
     prisma.note.findMany({
       where: { userId },
@@ -81,6 +90,13 @@ async function getSmartDashboardData(userId: string) {
     }),
     safeAggregate()
   ]);
+
+  // --- 0. DATA TRANSFORMATION (Fix Type Error) ---
+  const contacts = rawContacts.map(c => ({
+    ...c,
+    company: c.company?.name || c.companyName || null,
+    tags: c.tags.map(t => ({ id: t.id, name: t.name })) 
+  }));
 
   // --- 1. GENERATE SMART ALERTS ---
   const alerts: SmartAlert[] = [];
@@ -174,10 +190,12 @@ async function getSmartDashboardData(userId: string) {
 
   // --- 3. FINANCIALS ---
   const wonRevenue = deals.filter(d => d.status === 'WON').reduce((sum, d) => sum + d.amount, 0);
+  const totalExpenses = expenseTotal;
   const netProfit = wonRevenue - totalExpenses;
   const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING', 'OPEN'].includes(d.status));
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
 
+  // FIX: Use the transformed 'contacts' array for the active list
   const activeContacts = contacts.filter(c => c.lastContactedAt && new Date(c.lastContactedAt) >= sevenDaysAgo).slice(0, 10);
 
   return {
@@ -188,7 +206,7 @@ async function getSmartDashboardData(userId: string) {
     activeContacts,
     activities, 
     recentDeals: deals.slice(0, 3),
-    urgentTasks, // Include this for the tasks list rendering
+    urgentTasks,
     financials: {
       revenue: wonRevenue,
       expenses: totalExpenses,
@@ -204,6 +222,17 @@ export default async function Home() {
   const data = await getSmartDashboardData(user.id);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  // Helper for Alert Styling
+  const getAlertStyle = (type: AlertType) => {
+    switch (type) {
+      case 'CRITICAL': return 'text-error';
+      case 'WARNING': return 'text-warning';
+      case 'INFO': return 'text-info';
+      case 'SUCCESS': return 'text-success';
+      default: return 'text-base-content';
+    }
+  };
 
   return (
     <div className="space-y-8 pb-24">
@@ -222,6 +251,7 @@ export default async function Home() {
         </div>
         
         <div className="w-full md:w-auto flex justify-end">
+          {/* FIX: Removed alerts prop */}
           <HomeActions />
         </div>
       </div>
@@ -242,12 +272,46 @@ export default async function Home() {
              </div>
            </div>
 
+           {/* This widget now receives the correctly typed, flattened contact data */}
            <ContactListWidget contacts={data.activeContacts} />
         </div>
 
         {/* LEFT COLUMN (Main Feed) */}
         <div className="lg:col-span-8 lg:col-start-1 lg:row-start-1 space-y-6">
           
+          {/* SMART ALERTS (Replaces Dropdown, displayed inline) */}
+          {data.alerts.length > 0 && (
+             <div className="bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden">
+                <div className="px-4 py-2 bg-base-200/30 border-b border-base-200 flex justify-between items-center">
+                  <h3 className="font-bold text-xs uppercase tracking-widest text-base-content/60 flex items-center gap-2">
+                    <BellAlertIcon className="w-4 h-4" /> Morning Briefing
+                  </h3>
+                  <span className="badge badge-sm badge-neutral">{data.alerts.length}</span>
+                </div>
+                <div className="divide-y divide-base-100">
+                  {data.alerts.map((alert) => (
+                    <Link href={alert.link} key={alert.id} className="flex items-center gap-4 p-4 hover:bg-base-50 transition-colors group">
+                       <div className={`p-2 rounded-xl shrink-0 ${
+                         alert.type === 'CRITICAL' ? 'bg-error/10 text-error' :
+                         alert.type === 'WARNING' ? 'bg-warning/10 text-warning' :
+                         alert.type === 'INFO' ? 'bg-info/10 text-info' :
+                         'bg-success/10 text-success'
+                       }`}>
+                         <alert.icon className="w-5 h-5" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <div className="font-bold text-sm text-base-content group-hover:text-primary transition-colors truncate">
+                            {alert.message}
+                          </div>
+                          <p className="text-xs text-base-content/60 truncate">{alert.subtext}</p>
+                       </div>
+                       <ChevronRightIcon className="w-5 h-5 text-base-content/20 group-hover:text-primary self-center transition-colors" />
+                    </Link>
+                  ))}
+                </div>
+             </div>
+          )}
+
           {/* TASKS */}
           <div>
              <div className="flex justify-between items-center px-1 mb-2">
@@ -264,7 +328,6 @@ export default async function Home() {
           </div>
 
           {/* ACTIVITY FEED */}
-          {/* ... Activity feed rendering ... */}
           <div>
              <h3 className="font-bold text-sm text-base-content/70 px-1 mb-2">Recent Activity</h3>
              <div className="bg-base-100 rounded-xl border border-base-200 shadow-sm divide-y divide-base-100">
