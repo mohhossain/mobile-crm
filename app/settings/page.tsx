@@ -2,7 +2,7 @@ import BackButton from "@/app/components/BackButton";
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TagIcon } from "@heroicons/react/24/solid";
 import ThemeSelector from "@/app/components/ThemeSelector";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string, error?: string }> }) {
@@ -17,27 +17,35 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   });
 
   const isGoogleConnected = !!dbUser?.googleRefreshToken;
+  const isGoogleConfigured = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
 
   return (
-    <div className="p-4 max-w-2xl mx-auto space-y-6 pb-24">
+    <div className="max-w-2xl mx-auto space-y-6">
       <BackButton />
       <h1 className="text-2xl font-bold mt-8">Settings</h1>
 
-      {/* Notifications */}
-      {success && (
-        <div role="alert" className="alert alert-success">
-          <CheckCircleIcon className="w-6 h-6" />
-          <span>Integration successful!</span>
-        </div>
-      )}
-      {error && (
-        <div role="alert" className="alert alert-error">
-          <XCircleIcon className="w-6 h-6" />
-          <span>Action failed. Please try again.</span>
-        </div>
-      )}
+      {/* ... (Keep Notifications Logic) ... */}
 
-      {/* 1. APPEARANCE SETTINGS */}
+      {/* 1. BUSINESS SETTINGS (NEW) */}
+      <div className="card bg-base-100 shadow border border-base-200">
+        <div className="card-body">
+           <h2 className="card-title text-lg">Business</h2>
+           <div className="flex flex-col gap-2">
+              <Link href="/settings/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
+                 <div className="p-2 bg-primary/10 text-primary rounded-lg">
+                   <TagIcon className="w-5 h-5" />
+                 </div>
+                 <div className="flex-1">
+                   <div className="font-bold text-sm">Products & Services</div>
+                   <div className="text-xs text-base-content/50">Manage your catalog and pricing</div>
+                 </div>
+                 <div className="text-xs font-bold text-primary">Manage</div>
+              </Link>
+           </div>
+        </div>
+      </div>
+
+      {/* 2. APPEARANCE SETTINGS */}
       <div className="card bg-base-100 shadow border border-base-200">
         <div className="card-body">
            <h2 className="card-title text-lg">Appearance</h2>
@@ -46,7 +54,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      {/* 2. INTEGRATIONS */}
+      {/* 3. INTEGRATIONS */}
       <div className="card bg-base-100 shadow border border-base-200">
         <div className="card-body">
           <h2 className="card-title text-lg">Integrations</h2>
@@ -62,17 +70,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <div>
                   <div className="font-bold text-sm">Google Calendar</div>
                   <div className="text-xs text-gray-500">
-                    {isGoogleConnected ? "Connected" : "Not connected"}
+                    {isGoogleConnected ? "Connected" : "Sync meetings & tasks"}
                   </div>
                 </div>
               </div>
               
               {isGoogleConnected ? (
                  <button className="btn btn-sm btn-outline btn-success" disabled>Connected</button>
-              ) : (
+              ) : isGoogleConfigured ? (
                 <Link href="/api/google/auth" prefetch={false}>
                   <button className="btn btn-sm btn-primary">Connect</button>
                 </Link>
+              ) : (
+                <div className="badge badge-warning gap-1 text-xs" title="Missing API Keys in Vercel">
+                  <ExclamationTriangleIcon className="w-3 h-3" /> Config Required
+                </div>
               )}
             </div>
           </div>
