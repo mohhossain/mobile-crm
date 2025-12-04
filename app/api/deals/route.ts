@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/currentUser";
 
-// Helper to prevent Invalid Date crashes
 const toSafeDate = (dateStr: any): Date | null => {
   if (!dateStr) return null;
   const date = new Date(dateStr);
@@ -20,6 +19,7 @@ export async function GET() {
             include: {
                 tags: true,
                 contacts: true,
+                lineItems: true, // Fetch Line Items
                 notes: { include: { user: true } },
                 expenses: true,
             },
@@ -36,22 +36,22 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { title, amount, tags, status, contactIds, closeDate, notes, expenses } = body;
+  const { title, amount, tags, status, contactIds, closeDate, notes, expenses, lineItems } = body;
 
   const safeTags = Array.isArray(tags) ? tags : [];
   const safeContactIds = Array.isArray(contactIds) ? contactIds : [];
   const safeNotes = Array.isArray(notes) ? notes.filter((n: any) => typeof n === "string" && n.trim() !== "") : [];
   const safeExpenses = Array.isArray(expenses) ? expenses : [];
-  const parsedAmount = typeof amount === "number" && !isNaN(amount) ? amount : null;
+  const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
+  const parsedAmount = typeof amount === "number" && !isNaN(amount) ? amount : 0;
 
   try {
     const deal = await prisma.deal.create({
       data: {
         title,
-        amount: parsedAmount ?? 0,
+        amount: parsedAmount,
         status: status || "PENDING",
         userId: user.id,
-        // FIX: Properly parse the date
         closeDate: toSafeDate(closeDate), 
         
         tags: safeTags.length > 0 ? {
@@ -72,7 +72,6 @@ export async function POST(request: Request) {
           })),
         } : undefined,
 
-        // FIX: Do NOT pass dealId here. Prisma automatically links nested creates.
         expenses: safeExpenses.length > 0 ? {
           create: safeExpenses.map((exp: any) => ({
             description: exp.description,
@@ -80,6 +79,16 @@ export async function POST(request: Request) {
             category: exp.category || "OTHER",
             date: exp.date ? new Date(exp.date) : new Date(),
             userId: user.id
+          }))
+        } : undefined,
+
+        // NEW: Create Line Items
+        lineItems: safeLineItems.length > 0 ? {
+          create: safeLineItems.map((item: any) => ({
+            name: item.name,
+            quantity: Number(item.quantity),
+            price: Number(item.price),
+            productId: item.productId || null // Link to product if ID exists
           }))
         } : undefined
       },
@@ -92,12 +101,14 @@ export async function POST(request: Request) {
   }
 }
 
+// ... (DELETE remains the same) ...
 export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
     const { id } = body;
+
     if (!id) return NextResponse.json({ error: "Missing deal id" }, { status: 400 });
 
     try {

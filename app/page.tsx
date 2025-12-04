@@ -63,7 +63,7 @@ async function getSmartDashboardData(userId: string) {
     }),
     prisma.contact.findMany({
       where: { userId },
-      include: { tags: true },
+      include: { tags: true, company: true },
       orderBy: { lastContactedAt: 'desc' },
       take: 10
     }),

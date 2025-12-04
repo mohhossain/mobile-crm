@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { XMarkIcon, MagnifyingGlassIcon } from "@heroicons/react/20/solid";
 
-interface Contact {
+// FIXED: Added 'export' to allow importing in other components
+export interface Contact {
   id: string;
   name: string;
   email: string | null;
