@@ -2,7 +2,7 @@ import React from 'react';
 import { getCurrentUser } from '@/lib/currentUser';
 import { prisma } from '@/lib/prisma';
 import AddLeads from '../components/AddLeads';
-import ContactList from '../components/ContactList'; // Use the new list manager
+import ContactList from '../components/ContactList';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 export default async function ContactsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -18,13 +18,29 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
          OR: [
            { name: { contains: q, mode: 'insensitive' } },
            { email: { contains: q, mode: 'insensitive' } },
-           { company: { contains: q, mode: 'insensitive' } }
+           // FIX: Search legacy string field
+           { companyName: { contains: q, mode: 'insensitive' } },
+           // FIX: Search relation field safely
+           { company: { name: { contains: q, mode: 'insensitive' } } }
          ]
        } : {})
      },
-     include: { tags: true },
+     include: { 
+       tags: true,
+       company: true // Include the company relation data
+     },
      orderBy: { createdAt: 'desc' }
   });
+
+  // FIX: Transform data to match the client component's expected interface.
+  // The Client Component expects 'company' to be a string, not an object.
+  const formattedContacts = contacts.map(contact => ({
+    ...contact,
+    // Flatten company info: Use the relation name if it exists, otherwise legacy string
+    company: contact.company?.name || contact.companyName || null,
+    // Ensure tags are mapped correctly if needed (though Prisma returns the right shape mostly)
+    tags: contact.tags.map(t => ({ id: t.id, name: t.name }))
+  }));
 
   return (
     <div className="space-y-6">
@@ -52,7 +68,8 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
        </div>
 
        {/* Interactive List Manager */}
-       <ContactList initialContacts={contacts} />
+       {/* We pass the formatted contacts that have 'company' as a string */}
+       <ContactList initialContacts={formattedContacts} />
     </div>
   );
 }
