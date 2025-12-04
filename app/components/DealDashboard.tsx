@@ -21,6 +21,7 @@ import TaskCard from './TaskCard';
 import DealNotes from './DealNotes';
 import QuickTaskForm from './QuickTaskForm';
 import DealFinances from './DealFinances';
+import InvoiceButton from "./InvoiceButton";
 
 interface DashboardProps {
   deal: any; 
@@ -259,7 +260,7 @@ export default function DealDashboard({ deal: initialDeal }: DashboardProps) {
       <div className="min-h-[400px]">
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in zoom-in duration-200">
-             {/* Forecast Card (Same as before) */}
+             {/* Forecast Card */}
              <div className="card bg-base-100 shadow-sm border border-base-200">
                 <div className="card-body p-5">
                    <h3 className="card-title text-sm uppercase text-gray-500 mb-4 flex items-center gap-2"><FireIcon className="w-4 h-4 text-orange-500" /> Forecast</h3>
@@ -274,6 +275,9 @@ export default function DealDashboard({ deal: initialDeal }: DashboardProps) {
                       </div>
                       <div className="w-1/2"><input type="range" min="0" max="100" value={deal.probability} onChange={(e) => handleProbabilityChange(parseInt(e.target.value))} className="range range-xs range-primary" /></div>
                    </div>
+
+                   {/* Inserted Invoice Button Here */}
+                   <InvoiceButton deal={deal} user={{ name: "Me", email: "me@pulse.com" }} />
                 </div>
              </div>
              {/* Contacts Card (Same as before) */}

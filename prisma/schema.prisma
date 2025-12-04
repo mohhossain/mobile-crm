@@ -140,6 +140,9 @@ model Deal {
   lineItems   DealLineItem[]
   
   tags        Tag[]      @relation("TagDeals")
+
+  invoiceStatus InvoiceStatus @default(NONE) // NEW
+  paymentTerms  String?       @default("Net 30") // NEW
   
   // FIX: Removed @relation(onDelete: Cascade) from these parent fields.
   // The cascade logic is correctly defined on the child models (Task, Note, etc.) below.
@@ -272,4 +275,12 @@ enum LeadStatus {
   CONVERTED
   HOT
   COLD
+}
+
+enum InvoiceStatus {
+  NONE
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
 }
