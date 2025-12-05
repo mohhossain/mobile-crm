@@ -32,7 +32,7 @@ export default function Sidebar() {
   const navItems = [
     { name: "Overview", path: "/", icon: HomeIcon, activeIcon: HomeSolid },
     { name: "Pipeline", path: "/deals", icon: BriefcaseIcon, activeIcon: DealSolid },
-    { name: "Finance", path: "/finance", icon: BanknotesIcon, activeIcon: BanknotesSolid }, // Added
+    { name: "Finance", path: "/finance", icon: BanknotesIcon, activeIcon: BanknotesSolid },
     { name: "Tasks", path: "/tasks", icon: ClipboardDocumentCheckIcon, activeIcon: TaskSolid },
     { name: "Contacts", path: "/contacts", icon: UserGroupIcon, activeIcon: UserSolid },
     { name: "Settings", path: "/settings", icon: Cog6ToothIcon, activeIcon: CogSolid },

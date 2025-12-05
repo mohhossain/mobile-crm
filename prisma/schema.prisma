@@ -14,6 +14,14 @@ model User {
   email              String    @unique
   googleAccessToken  String?
   googleRefreshToken String?
+  
+  // NEW: Public Profile Fields (Ensure these exist!)
+  username           String?   @unique
+  bio                String?
+  website            String?
+  avatar             String?
+  isProfileLive      Boolean   @default(false)
+  
   gigs               Gig[]
   contacts           Contact[]
   companies          Company[]
@@ -48,13 +56,10 @@ model Company {
   website   String?
   logo      String?
   domain    String?
-  
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  
   contacts  Contact[]
   deals     Deal[]
-
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -64,28 +69,22 @@ model Contact {
   name            String
   email           String?
   phone           String?
-  
   jobTitle        String?
   companyName     String?
   linkedin        String?
   location        String?
-  
   imageUrl        String?
   lastContactedAt DateTime?
-  
   userId          String
   user            User      @relation(fields: [userId], references: [id])
-  
   companyId       String?
   company         Company?  @relation(fields: [companyId], references: [id])
-  
   tags            Tag[]     @relation("ContactTags")
   deals           Deal[]    @relation("ContactDeals")
   tasks           Task[]    @relation("_ContactToTask")
   notes           Note[]
   meetings        Meeting[]
   gigs            Gig[]     @relation("GigContacts")
-
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
 }
@@ -96,12 +95,10 @@ model Product {
   description String?
   unitPrice   Float
   sku         String?
-  
+  isPublic    Boolean  @default(false)
   userId      String
   user        User     @relation(fields: [userId], references: [id])
-  
   lineItems   DealLineItem[]
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -111,49 +108,38 @@ model DealLineItem {
   quantity    Int      @default(1)
   price       Float
   name        String
-  
   dealId      String
   deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  
   productId   String?
   product     Product? @relation(fields: [productId], references: [id])
 }
 
 model Deal {
-  id          String     @id @default(uuid())
-  title       String
-  amount      Float
-  status      DealStatus
-  probability Int        @default(50)
-  
-  gigId       String?
-  gig         Gig?       @relation(fields: [gigId], references: [id])
-  
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
-  
-  contacts    Contact[]  @relation("ContactDeals")
-  
-  companyId   String?
-  company     Company?   @relation(fields: [companyId], references: [id])
-
-  lineItems   DealLineItem[]
-  
-  tags        Tag[]      @relation("TagDeals")
-
-  invoiceStatus InvoiceStatus @default(NONE) // NEW
-  paymentTerms  String?       @default("Net 30") // NEW
-  
-  // FIX: Removed @relation(onDelete: Cascade) from these parent fields.
-  // The cascade logic is correctly defined on the child models (Task, Note, etc.) below.
-  tasks       Task[]
-  notes       Note[]
-  meetings    Meeting[]
-  expenses    Expense[]
-  
-  closeDate   DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @default(now()) @updatedAt
+  id            String        @id @default(uuid())
+  title         String
+  amount        Float
+  status        DealStatus
+  probability   Int           @default(50)
+  invoiceStatus InvoiceStatus @default(NONE)
+  paymentTerms  String?       @default("Net 30")
+  shareToken    String?       @unique @default(uuid())
+  portalViews   Int           @default(0)
+  gigId         String?
+  gig           Gig?          @relation(fields: [gigId], references: [id])
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  contacts      Contact[]     @relation("ContactDeals")
+  companyId     String?
+  company       Company?      @relation(fields: [companyId], references: [id])
+  lineItems     DealLineItem[]
+  tags          Tag[]         @relation("TagDeals")
+  tasks         Task[]
+  notes         Note[]
+  meetings      Meeting[]
+  expenses      Expense[]
+  closeDate     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
 }
 
 model Service {
@@ -173,16 +159,12 @@ model Note {
   content   String
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
   dealId    String?
   deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 }
@@ -204,15 +186,14 @@ model Task {
   startDate   DateTime?
   dueDate     DateTime?
   status      TaskStatus @default(TO_DO)
+  isPublic    Boolean    @default(false)
   userId      String
   user        User       @relation(fields: [userId], references: [id])
   contacts    Contact[]  @relation("_ContactToTask")
   gigId       String?
   gig         Gig?       @relation(fields: [gigId], references: [id])
-  
   dealId      String?
   deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  
   notes       Note[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -240,13 +221,10 @@ model Expense {
   amount      Float
   category    String   @default("OTHER")
   date        DateTime @default(now())
-  
   dealId      String?
   deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  
   userId      String
   user        User     @relation(fields: [userId], references: [id])
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

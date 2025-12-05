@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PlusIcon, TrashIcon, BanknotesIcon, TagIcon, CalculatorIcon } from "@heroicons/react/24/outline";
+import { 
+  PlusIcon, 
+  TrashIcon, 
+  BanknotesIcon, 
+  TagIcon, 
+  UserGroupIcon, 
+  ClipboardDocumentListIcon, 
+  ArrowRightIcon, 
+  ArrowLeftIcon, 
+  CheckIcon,
+  ShoppingBagIcon
+} from "@heroicons/react/24/outline";
 
 import InputTags from "./InputTags";
 import AddLeads from "./AddLeads";
@@ -29,40 +40,46 @@ interface LineItem {
   price: number;
 }
 
+const STEPS = [
+  { id: 1, title: "The Basics", icon: ClipboardDocumentListIcon },
+  { id: 2, title: "Financials", icon: ShoppingBagIcon },
+  { id: 3, title: "People", icon: UserGroupIcon },
+  { id: 4, title: "Context", icon: TagIcon },
+];
+
 const AddDeals = () => {
-  const [title, setTitle] = useState("");
-  const [status, setStatus] = useState("PENDING");
-  const [tags, setTags] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const router = useRouter();
   
+  // --- FORM STATE ---
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState("OPEN");
   const [closeDateDate, setCloseDateDate] = useState("");
   const [closeDateTime, setCloseDateTime] = useState("");
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([
+    { name: "Consulting Services", quantity: 1, price: 0 }
+  ]);
+  const [calculatedAmount, setCalculatedAmount] = useState(0);
+
+  const [expenses, setExpenses] = useState<ExpenseDraft[]>([]);
+  const [newExpense, setNewExpense] = useState<ExpenseDraft>({
+    description: "", amount: "", category: "OTHER", date: new Date().toISOString().split('T')[0]
+  });
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   const [contactOptions, setContactOptions] = useState<Contact[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+
   const [notes, setNotes] = useState<string[]>([]);
-  
-  const [expenses, setExpenses] = useState<ExpenseDraft[]>([]);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [newExpense, setNewExpense] = useState<ExpenseDraft>({
-    description: "",
-    amount: "",
-    category: "OTHER",
-    date: new Date().toISOString().split('T')[0]
-  });
+  const [tags, setTags] = useState<string[]>([]);
 
-  // NEW: Product & Line Item State
-  const [products, setProducts] = useState<Product[]>([]);
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { name: "Consulting Services", quantity: 1, price: 0 } // Default empty item
-  ]);
-  const [calculatedAmount, setCalculatedAmount] = useState(0);
-  
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // --- FETCH DATA ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -85,63 +102,51 @@ const AddDeals = () => {
     fetchData();
   }, []);
 
-  // Recalculate total whenever line items change
+  // --- LOGIC ---
   useEffect(() => {
     const total = lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     setCalculatedAmount(total);
   }, [lineItems]);
 
-  const handleAddLineItem = () => {
-    setLineItems([...lineItems, { name: "", quantity: 1, price: 0 }]);
+  const handleNext = () => {
+    if (currentStep === 1 && !title) return alert("Please enter a deal title.");
+    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
   };
 
+  const handleBack = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  // Line Item Handlers
+  const handleAddLineItem = () => setLineItems([...lineItems, { name: "", quantity: 1, price: 0 }]);
   const handleRemoveLineItem = (index: number) => {
-    if (lineItems.length > 1) {
-      setLineItems(lineItems.filter((_, i) => i !== index));
-    }
+    if (lineItems.length > 1) setLineItems(lineItems.filter((_, i) => i !== index));
   };
-
   const updateLineItem = (index: number, field: keyof LineItem, value: any) => {
     const newItems = [...lineItems];
     newItems[index] = { ...newItems[index], [field]: value };
     setLineItems(newItems);
   };
-
   const handleProductSelect = (index: number, productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
       const newItems = [...lineItems];
-      newItems[index] = {
-        ...newItems[index],
-        productId: product.id,
-        name: product.name,
-        price: product.unitPrice
-      };
+      newItems[index] = { ...newItems[index], productId: product.id, name: product.name, price: product.unitPrice };
       setLineItems(newItems);
     }
   };
 
-  // ... (Keep existing expense handlers: handleAddExpense, handleRemoveExpense)
+  // Expense Handlers
   const handleAddExpense = () => {
     if(!newExpense.description || !newExpense.amount) return;
     setExpenses([...expenses, newExpense]);
-    setNewExpense({
-      description: "",
-      amount: "",
-      category: "OTHER",
-      date: new Date().toISOString().split('T')[0]
-    });
+    setNewExpense({ description: "", amount: "", category: "OTHER", date: new Date().toISOString().split('T')[0] });
+    setShowExpenseForm(false);
   };
 
-  const handleRemoveExpense = (index: number) => {
-    setExpenses(expenses.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     setLoading(true);
     setError(null);
-    setSuccess(false);
 
     let finalCloseDate = null;
     if (closeDateDate) {
@@ -155,238 +160,237 @@ const AddDeals = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          amount: calculatedAmount, // Use the calculated total
+          amount: calculatedAmount,
           status,
           tags,
           closeDate: finalCloseDate,
           contactIds: selectedContacts.map((c) => c.id),
           notes,
           expenses,
-          lineItems // Send line items to API
+          lineItems
         }),
       });
 
       if (!response.ok) throw new Error("Failed to add deal");
-
-      setSuccess(true);
-      setTitle(""); 
-      setLineItems([{ name: "Consulting Services", quantity: 1, price: 0 }]);
-      setStatus("OPEN"); 
-      setTags([]);
-      setSelectedContacts([]); 
-      setCloseDateDate(""); setCloseDateTime("");
-      setNotes([]); setExpenses([]);
       router.refresh();
+      // Optional: Close modal logic could be handled by parent if passed as prop, 
+      // but router refresh usually triggers UI updates. We'll reset state just in case.
+      setCurrentStep(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <form className="max-w-3xl mx-auto p-6 pb-32 space-y-8" onSubmit={handleSubmit}>
-        <h2 className="text-2xl font-bold text-center">Create New Deal</h2>
-        
-        {error && <div className="alert alert-error text-sm">{error}</div>}
-        {success && <div className="alert alert-success text-sm">Deal added successfully!</div>}
+    <div className="flex flex-col h-full min-h-[400px]">
+      
+      {/* 1. WIZARD HEADER */}
+      <div className="px-6 py-4 bg-base-100 border-b border-base-200">
+        <ul className="steps steps-vertical sm:steps-horizontal w-full">
+          {STEPS.map((step) => (
+            <li 
+              key={step.id} 
+              className={`step text-xs font-bold ${currentStep >= step.id ? 'step-primary' : ''}`}
+              data-content={currentStep > step.id ? "✓" : step.id}
+            >
+              {step.title}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        <div className="space-y-6">
-          
-          {/* Title & Status */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 form-control">
-              <label className="label font-semibold">Deal Title</label>
+      {/* 2. SCROLLABLE CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-base-100">
+        
+        {/* STEP 1: BASICS */}
+        {currentStep === 1 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="form-control w-full">
+              <label className="label font-bold">What is this deal?</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Website Redesign"
-                required
-                className="input input-bordered w-full"
+                placeholder="e.g. Website Redesign for Acme"
+                className="input input-lg input-bordered w-full text-xl font-bold placeholder:font-normal"
+                autoFocus
               />
             </div>
-            <div className="form-control">
-              <label className="label font-semibold">Status</label>
-              <select className="select select-bordered w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="OPEN">Open</option>
-                <option value="NEGOTIATION">Negotiation</option>
-                <option value="PENDING">Pending</option>
-                <option value="WON">Won</option>
-                <option value="LOST">Lost</option>
-              </select>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="form-control">
+                <label className="label font-semibold">Pipeline Stage</label>
+                <select className="select select-bordered w-full" value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="OPEN">Open</option>
+                  <option value="NEGOTIATION">Negotiation</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="WON">Won</option>
+                </select>
+              </div>
+
+              <div className="form-control">
+                <label className="label font-semibold">Target Close Date</label>
+                <div className="flex gap-2">
+                  <input type="date" className="input input-bordered w-full" value={closeDateDate} onChange={(e) => setCloseDateDate(e.target.value)} />
+                  <input type="time" className="input input-bordered w-32" value={closeDateTime} onChange={(e) => setCloseDateTime(e.target.value)} />
+                </div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* NEW: LINE ITEMS BUILDER */}
-          <div className="bg-base-100 rounded-xl border border-base-300 p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-               <label className="label font-semibold py-0 flex items-center gap-2">
-                 <TagIcon className="w-4 h-4" /> Services & Products
-               </label>
-               <div className="badge badge-primary badge-outline text-sm font-bold">
-                 Total: ${calculatedAmount.toLocaleString()}
-               </div>
-            </div>
+        {/* STEP 2: FINANCIALS */}
+        {currentStep === 2 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
             
-            <div className="space-y-2">
+            {/* Line Items */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end border-b border-base-200 pb-2">
+                 <label className="font-bold text-lg">Revenue Items</label>
+                 <span className="text-2xl font-black text-success">${calculatedAmount.toLocaleString()}</span>
+              </div>
+              
               {lineItems.map((item, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center bg-base-200/50 p-2 rounded-lg group">
-                   {/* Product Selector */}
+                <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-base-200/50 p-3 rounded-xl border border-base-200">
                    {products.length > 0 && (
                      <select 
-                       className="select select-sm select-bordered w-full sm:w-32"
+                       className="select select-sm select-ghost w-full sm:w-1/3"
                        value={item.productId || ""}
                        onChange={(e) => handleProductSelect(idx, e.target.value)}
                      >
-                       <option value="">Custom Item</option>
+                       <option value="">Custom Service</option>
                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                      </select>
                    )}
-                   
-                   {/* Name Input */}
-                   <input 
-                     className="input input-sm input-bordered w-full sm:flex-1" 
-                     placeholder="Service Description"
-                     value={item.name}
-                     onChange={(e) => updateLineItem(idx, 'name', e.target.value)}
-                   />
-
-                   {/* Qty & Price */}
-                   <div className="flex gap-2 w-full sm:w-auto">
-                     <input 
-                       type="number" 
-                       className="input input-sm input-bordered w-16 text-center" 
-                       value={item.quantity}
-                       onChange={(e) => updateLineItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                       placeholder="Qty"
-                     />
-                     <input 
-                       type="number" 
-                       className="input input-sm input-bordered w-24 text-right" 
-                       value={item.price}
-                       onChange={(e) => updateLineItem(idx, 'price', parseFloat(e.target.value) || 0)}
-                       placeholder="$"
-                     />
+                   <input className="input input-sm input-ghost w-full sm:flex-1 font-medium" placeholder="Description" value={item.name} onChange={(e) => updateLineItem(idx, 'name', e.target.value)} />
+                   <div className="flex gap-2">
+                     <input type="number" className="input input-sm input-bordered w-16 text-center" value={item.quantity} onChange={(e) => updateLineItem(idx, 'quantity', parseFloat(e.target.value) || 0)} placeholder="Qty" />
+                     <input type="number" className="input input-sm input-bordered w-24 text-right" value={item.price} onChange={(e) => updateLineItem(idx, 'price', parseFloat(e.target.value) || 0)} placeholder="$" />
                    </div>
-
-                   {/* Delete */}
-                   <button type="button" onClick={() => handleRemoveLineItem(idx)} className="btn btn-xs btn-ghost btn-square text-gray-400 hover:text-error">
-                     <TrashIcon className="w-4 h-4" />
-                   </button>
+                   <button onClick={() => handleRemoveLineItem(idx)} className="btn btn-sm btn-ghost btn-square text-error"><TrashIcon className="w-4 h-4" /></button>
                 </div>
               ))}
+              <button onClick={handleAddLineItem} className="btn btn-xs btn-outline border-dashed w-full">+ Add Item</button>
             </div>
-            
-            <button type="button" onClick={handleAddLineItem} className="btn btn-xs btn-ghost mt-2 gap-1">
-              <PlusIcon className="w-3 h-3" /> Add Item
-            </button>
+
+            {/* Expenses */}
+            <div className="bg-base-200 p-4 rounded-xl border border-base-300">
+               <div className="flex justify-between items-center mb-3">
+                 <h3 className="font-bold text-sm text-base-content/60 uppercase">Initial Costs</h3>
+                 <button onClick={() => setShowExpenseForm(!showExpenseForm)} className="btn btn-xs btn-ghost">+ Add Expense</button>
+               </div>
+               
+               {expenses.length > 0 && (
+                 <div className="space-y-2 mb-3">
+                   {expenses.map((exp, i) => (
+                     <div key={i} className="flex justify-between text-xs bg-base-100 p-2 rounded border border-base-200">
+                        <span>{exp.description}</span>
+                        <span className="text-error font-mono">-${exp.amount}</span>
+                     </div>
+                   ))}
+                 </div>
+               )}
+
+               {showExpenseForm && (
+                 <div className="grid grid-cols-2 gap-2 animate-in fade-in">
+                    <input className="input input-xs input-bordered col-span-2" placeholder="Description" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} />
+                    <input type="number" className="input input-xs input-bordered" placeholder="$ Amount" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} />
+                    <select className="select select-xs select-bordered" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})}>
+                      <option value="OTHER">Other</option><option value="LABOR">Labor</option><option value="SOFTWARE">Software</option>
+                    </select>
+                    <button onClick={handleAddExpense} className="btn btn-xs btn-primary col-span-2">Add Expense</button>
+                 </div>
+               )}
+            </div>
           </div>
+        )}
 
-          {/* Date & Contacts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="form-control">
-              <label className="label font-semibold">Target Close</label>
-              <div className="flex gap-2">
-                <input type="date" className="input input-bordered w-full" value={closeDateDate} onChange={(e) => setCloseDateDate(e.target.value)} />
-                <input type="time" className="input input-bordered w-28" value={closeDateTime} onChange={(e) => setCloseDateTime(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="form-control">
-              <label className="label font-semibold">Contacts</label>
-              <ContactMultiSelect
-                contacts={contactOptions}
-                selected={selectedContacts}
-                onChange={(newSelected) => setSelectedContacts(newSelected)}
-              />
-              <button type="button" className="btn btn-ghost btn-xs mt-1 self-start" onClick={() => setShowAddContactModal(true)}>+ Create New</button>
-            </div>
-          </div>
-
-          {/* Expenses (Keep existing logic) */}
-          <div className="bg-base-200/50 p-6 rounded-xl border border-base-300">
-            <div className="flex justify-between items-center mb-4">
-              <label className="label font-semibold py-0 flex items-center gap-2 text-lg">
-                <BanknotesIcon className="w-5 h-5" /> Initial Expenses
-              </label>
-              <button type="button" onClick={() => setShowExpenseForm(!showExpenseForm)} className="btn btn-sm btn-ghost">{showExpenseForm ? "Hide" : "+ Add Expense"}</button>
-            </div>
-            {expenses.length > 0 && (
-              <div className="space-y-3 mb-4">
-                {expenses.map((exp, idx) => (
-                  <div key={idx} className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm bg-base-100 p-3 rounded-lg border border-base-200 shadow-sm gap-2">
-                    <div>
-                       <span className="font-medium block sm:inline">{exp.description}</span>
-                       <span className="text-xs opacity-60 sm:ml-2 block sm:inline">{exp.category} • {new Date(exp.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-3 mt-2 sm:mt-0">
-                      <span className="text-error font-mono font-bold">-${exp.amount}</span>
-                      <button type="button" onClick={() => handleRemoveExpense(idx)} className="btn btn-ghost btn-xs btn-square text-gray-400 hover:text-error"><TrashIcon className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {showExpenseForm && (
-              <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-top-2 bg-base-100 p-4 rounded-lg border border-base-200">
-                <div className="w-full sm:flex-1 min-w-[200px]">
-                   <input placeholder="Description" className="input input-sm input-bordered w-full" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} />
+        {/* STEP 3: PEOPLE */}
+        {currentStep === 3 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+             <div className="text-center space-y-2">
+                <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <UserGroupIcon className="w-8 h-8" />
                 </div>
-                <div className="w-1/2 sm:w-24">
-                   <input type="number" placeholder="$" className="input input-sm input-bordered w-full" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} />
-                </div>
-                <div className="w-1/2 sm:w-32">
-                   <select className="select select-sm select-bordered w-full" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})}>
-                      <option value="OTHER">Other</option><option value="LABOR">Labor</option><option value="SOFTWARE">Software</option><option value="MATERIAL">Material</option>
-                   </select>
-                </div>
-                <div className="w-full sm:w-auto">
-                    <input type="date" className="input input-sm input-bordered w-full" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} />
-                </div>
-                <div className="w-full sm:w-auto">
-                  <button type="button" onClick={handleAddExpense} className="btn btn-sm btn-primary w-full"><PlusIcon className="w-5 h-5" /> Add</button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-6">
-             <div className="w-full">
-               <AddNotes notes={notes} onNotesInput={(n) => setNotes(n)} />
+                <h3 className="font-bold text-xl">Who is this deal for?</h3>
+                <p className="text-sm text-base-content/60">Attach contacts to track communication history.</p>
              </div>
-             <div className="w-full flex flex-col">
-                <label className="label font-semibold">Tags</label>
-                <InputTags tags={tags} onTagsInput={setTags} />
+
+             <div className="form-control">
+                <ContactMultiSelect
+                  contacts={contactOptions}
+                  selected={selectedContacts}
+                  onChange={setSelectedContacts}
+                />
              </div>
+             
+             <div className="divider text-xs text-base-content/40">OR</div>
+             
+             <button type="button" className="btn btn-outline btn-block" onClick={() => setShowAddContactModal(true)}>
+               <PlusIcon className="w-4 h-4" /> Create New Contact
+             </button>
           </div>
+        )}
 
-          <div className="pt-4">
-            <button type="submit" className={`btn btn-primary w-full btn-lg ${loading ? "loading" : ""}`} disabled={loading}>
-              {loading ? "Creating Deal..." : "Create Deal"}
-            </button>
+        {/* STEP 4: CONTEXT */}
+        {currentStep === 4 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+             <div className="form-control">
+               <label className="label font-bold">Deal Notes</label>
+               <AddNotes notes={notes} onNotesInput={setNotes} />
+             </div>
+
+             <div className="form-control">
+               <label className="label font-bold">Tags</label>
+               <InputTags tags={tags} onTagsInput={setTags} />
+             </div>
+             
+             {error && <div className="alert alert-error text-sm">{error}</div>}
           </div>
-        </div>
-      </form>
+        )}
 
-      {/* Contact Modal (Same as before) */}
+      </div>
+
+      {/* 3. WIZARD FOOTER */}
+      <div className="p-4 bg-base-100 border-t border-base-200 flex justify-between items-center">
+         {currentStep > 1 ? (
+           <button onClick={handleBack} className="btn btn-ghost gap-2">
+             <ArrowLeftIcon className="w-4 h-4" /> Back
+           </button>
+         ) : (
+           <div></div> // Spacer
+         )}
+
+         {currentStep < 4 ? (
+           <button onClick={handleNext} className="btn btn-primary px-8 gap-2">
+             Next <ArrowRightIcon className="w-4 h-4" />
+           </button>
+         ) : (
+           <button onClick={handleSubmit} disabled={loading} className="btn btn-success px-8 gap-2 shadow-lg shadow-success/20 text-white">
+             {loading ? <span className="loading loading-spinner"></span> : <><CheckIcon className="w-4 h-4" /> Create Deal</>}
+           </button>
+         )}
+      </div>
+
+      {/* CREATE CONTACT MODAL */}
       {showAddContactModal && (
-        <dialog open className="modal">
-          <div className="modal-box relative">
-            <button onClick={() => setShowAddContactModal(false)} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-            <h3 className="text-lg font-bold mb-2">Create New Contact</h3>
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[60]">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg mb-4">New Contact</h3>
             <AddLeads onSuccess={(newContact) => {
                 const c: Contact = { id: newContact.id, name: newContact.name, email: newContact.email, imageUrl: newContact.imageUrl };
                 setContactOptions((prev) => [...prev, c]);
                 setSelectedContacts((prev) => [...prev, c]);
                 setShowAddContactModal(false);
               }}
+              onCancel={() => setShowAddContactModal(false)}
             />
           </div>
         </dialog>
       )}
-    </>
+
+    </div>
   );
 };
 

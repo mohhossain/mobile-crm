@@ -4,17 +4,17 @@ import { useEffect, useState } from "react";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 
 const THEMES = [
-  { name: "Light (Cupcake)", value: "cupcake", icon: SunIcon },
-  { name: "Dark (Halloween)", value: "halloween", icon: MoonIcon },
+  { name: "Light", value: "fantasy", icon: SunIcon },
+  { name: "Dark", value: "forest", icon: MoonIcon },
 ];
 
 export default function ThemeSelector() {
-  const [currentTheme, setCurrentTheme] = useState("cupcake");
+  const [currentTheme, setCurrentTheme] = useState("fantasy");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    const stored = localStorage.getItem("theme") || "cupcake";
+    const stored = localStorage.getItem("theme") || "fantasy";
     setCurrentTheme(stored);
   }, []);
 

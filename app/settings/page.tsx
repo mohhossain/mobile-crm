@@ -2,7 +2,7 @@ import BackButton from "@/app/components/BackButton";
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TagIcon } from "@heroicons/react/24/solid";
+import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TagIcon, UserCircleIcon } from "@heroicons/react/24/solid";
 import ThemeSelector from "@/app/components/ThemeSelector";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string, error?: string }> }) {
@@ -20,17 +20,42 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const isGoogleConfigured = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-24">
       <BackButton />
       <h1 className="text-2xl font-bold mt-8">Settings</h1>
 
-      {/* ... (Keep Notifications Logic) ... */}
+      {/* Notifications */}
+      {success && (
+        <div role="alert" className="alert alert-success">
+          <CheckCircleIcon className="w-6 h-6" />
+          <span>Integration successful!</span>
+        </div>
+      )}
+      {error && (
+        <div role="alert" className="alert alert-error">
+          <XCircleIcon className="w-6 h-6" />
+          <span>Action failed. Please try again.</span>
+        </div>
+      )}
 
-      {/* 1. BUSINESS SETTINGS (NEW) */}
+      {/* 1. BUSINESS SETTINGS */}
       <div className="card bg-base-100 shadow border border-base-200">
         <div className="card-body">
            <h2 className="card-title text-lg">Business</h2>
            <div className="flex flex-col gap-2">
+              {/* NEW: Public Profile Link */}
+              <Link href="/settings/profile" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
+                 <div className="p-2 bg-secondary/10 text-secondary rounded-lg">
+                   <UserCircleIcon className="w-5 h-5" />
+                 </div>
+                 <div className="flex-1">
+                   <div className="font-bold text-sm">Public Profile</div>
+                   <div className="text-xs text-base-content/50">Customize your link-in-bio page</div>
+                 </div>
+                 <div className="text-xs font-bold text-primary">Manage</div>
+              </Link>
+
+              {/* Product Catalog Link */}
               <Link href="/settings/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
                  <div className="p-2 bg-primary/10 text-primary rounded-lg">
                    <TagIcon className="w-5 h-5" />

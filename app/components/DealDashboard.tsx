@@ -22,6 +22,7 @@ import DealNotes from './DealNotes';
 import QuickTaskForm from './QuickTaskForm';
 import DealFinances from './DealFinances';
 import InvoiceButton from "./InvoiceButton";
+import SharePortalButton from "./SharePortalButton";
 
 interface DashboardProps {
   deal: any; 
@@ -132,6 +133,7 @@ export default function DealDashboard({ deal: initialDeal }: DashboardProps) {
                <span>{deal.status}</span>
              </div>
              <div className="flex items-center gap-2">
+              <SharePortalButton shareToken={deal.shareToken} />
                
                {isStale && deal.status !== 'WON' && (
                  <div className="badge badge-warning gap-1 text-xs animate-pulse">

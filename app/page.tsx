@@ -20,6 +20,7 @@ import TaskCard from "./components/TaskCard";
 import FinancialPulseCard from "./components/FinancialPulseCard";
 import ContactListWidget from "./components/ContactListWidget";
 import HomeActions from "./components/HomeActions";
+import LandingPage from "./components/LandingPage";
 
 // --- TYPES ---
 type AlertType = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
@@ -217,7 +218,7 @@ async function getSmartDashboardData(userId: string) {
 
 export default async function Home() {
   const user = await getCurrentUser();
-  if (!user) return <div className="p-8 text-center text-gray-500">Please sign in to access your smart dashboard.</div>;
+  if (!user) return <LandingPage />
 
   const data = await getSmartDashboardData(user.id);
   const hour = new Date().getHours();
