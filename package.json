@@ -18,8 +18,7 @@
     "@clerk/nextjs": "^6.20.2",
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
-    "@prisma/client": "^6.9.0",
-    "@prisma/extension-accelerate": "^2.0.1",
+    "@prisma/extension-accelerate": "^2.0.2",
     "@radix-ui/themes": "^3.2.1",
     "@react-pdf/renderer": "^4.3.1",
     "@uiw/react-md-editor": "^4.0.7",
@@ -31,7 +30,6 @@
     "next": "^16.0.7",
     "next-cloudinary": "^6.16.0",
     "pikaday": "^1.8.2",
-    "prisma": "^6.9.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-tag-input": "^6.10.6",
@@ -39,10 +37,12 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@prisma/client": "^6.19.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "prisma": "^6.19.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

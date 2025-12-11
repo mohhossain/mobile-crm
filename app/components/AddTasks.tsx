@@ -8,13 +8,9 @@ export interface Contact {
   id: string
   name: string
   email: string | null
+  imageUrl?: string | null
 }
-export interface ContactOption {
-  id: string
-  name: string
-  email: string
-  imageUrl?: string
-}
+
 interface Deal {
   id: string
   title: string
@@ -39,34 +35,30 @@ export default function AddTaskForm() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  
-
-  // Fetch contacts on mount
-   useEffect(() => {
+  useEffect(() => {
     const fetchContacts = async () => {
       try {
         const res = await fetch("/api/leads");
         const data = await res.json();
         const contacts = Array.isArray(data) ? data : data.contacts;
-        setContactOptions(contacts);
+        setContactOptions(contacts || []);
       } catch (err) {
         console.error("Failed to fetch contacts", err);
       }
     };
-
     fetchContacts();
   }, []);
 
-
-  // Debounced deals search
   useEffect(() => {
     if (!dealQuery) return setDealResults([])
     const handle = setTimeout(async () => {
-      const res = await fetch(`/api/deals/search?query=${encodeURIComponent(dealQuery)}`)
-      const data = await res.json()
-      setDealResults(data)
-      // populate selected contacts if a deal is selected
-      
+      try {
+        const res = await fetch(`/api/deals/search?query=${encodeURIComponent(dealQuery)}`)
+        const data = await res.json()
+        setDealResults(Array.isArray(data) ? data : [])
+      } catch (e) {
+        console.error(e)
+      }
     }, 300)
     return () => clearTimeout(handle)
   }, [dealQuery])
@@ -75,25 +67,24 @@ export default function AddTaskForm() {
     e.preventDefault()
     setLoading(true)
     try {
+      const startISO = startDate ? (startTime ? `${startDate}T${startTime}` : `${startDate}T09:00`) : null;
+      const dueISO = dueDate ? (dueTime ? `${dueDate}T${dueTime}` : `${dueDate}T17:00`) : null;
+
       const response = await fetch('/api/tasks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
           description,
           priority,
-          startDate: startDate ? `${startDate}T${startTime}` : null,
-          dueDate: dueDate ? `${dueDate}T${dueTime}` : null,
+          startDate: startISO,
+          dueDate: dueISO,
           dealId: selectedDeal?.id || null,
           contactIds: selectedContacts.map(c => c.id) || [],
         }),
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to add task')
-      }
+      if (!response.ok) throw new Error('Failed to add task')
 
       setTitle('')
       setDescription('')
@@ -104,46 +95,74 @@ export default function AddTaskForm() {
       setDueTime('')
       setSelectedDeal(null)
       setSelectedContacts([])
+      setDealQuery('')
 
       router.refresh()
     } catch (error) {
       console.error('Error adding task:', error)
+      alert("Failed to add task. Please try again.")
     } finally {
       setLoading(false)
     }
   }
 
+  // FIX: Added 'pb-32' to ensure submit button is visible above the dock on mobile
   return (
-    <form onSubmit={handleSubmit} className="form-control space-y-4 w-full max-w-xs mx-auto">
-      {/* Basic Inputs */}
-      <input type="text" placeholder="Task Title" className="input input-bordered w-full" value={title} onChange={e => setTitle(e.target.value)} required />
-
-      <textarea placeholder="Task Description" className="textarea textarea-bordered w-full" value={description} onChange={e => setDescription(e.target.value)} rows={3} />
-
-      {/* Start and Due Date */}
-      <label className="label">Start Date & Time</label>
-      <div className="flex gap-2">
-        <input type="date" className="input input-bordered w-1/2" value={startDate} onChange={e => setStartDate(e.target.value)} />
-        <input type="time" className="input input-bordered w-1/2" value={startTime} onChange={e => setStartTime(e.target.value)} />
+    <form onSubmit={handleSubmit} className="form-control space-y-4 w-full bg-base-100 p-6 pb-32 rounded-xl border border-base-200 shadow-sm">
+      <h2 className="text-xl font-bold text-center mb-2">Create Task</h2>
+      
+      <div className="space-y-2">
+        <label className="label font-semibold py-0">Title</label>
+        <input 
+          type="text" 
+          placeholder="e.g. Call Client about Contract" 
+          className="input input-bordered w-full" 
+          value={title} 
+          onChange={e => setTitle(e.target.value)} 
+          required 
+        />
       </div>
 
-      <label className="label">Due Date & Time</label>
-      <div className="flex gap-2">
-        <input type="date" className="input input-bordered w-1/2" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-        <input type="time" className="input input-bordered w-1/2" value={dueTime} onChange={e => setDueTime(e.target.value)} />
+      <div className="space-y-2">
+        <label className="label font-semibold py-0">Description</label>
+        <textarea 
+          placeholder="Add details..." 
+          className="textarea textarea-bordered w-full" 
+          value={description} 
+          onChange={e => setDescription(e.target.value)} 
+          rows={3} 
+        />
       </div>
 
-      {/* Priority */}
-      <label className="label">Priority</label>
-      <select className="select select-bordered w-full" value={priority} onChange={e => setPriority(e.target.value)}>
-        <option value="1">Low</option>
-        <option value="2">Medium</option>
-        <option value="3">High</option>
-      </select>
+      <div className="space-y-2">
+        <label className="label font-semibold py-0">Priority</label>
+        <select className="select select-bordered w-full" value={priority} onChange={e => setPriority(e.target.value)}>
+          <option value="1">Low</option>
+          <option value="2">Medium</option>
+          <option value="3">High</option>
+        </select>
+      </div>
 
-      {/* Deal Search */}
-      <div className="relative">
-        <label className="label">Assign to Deal</label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label font-semibold py-0">Start Date</label>
+          <div className="flex gap-2 mt-1">
+            <input type="date" className="input input-bordered flex-1 min-w-0" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <input type="time" className="input input-bordered w-28" value={startTime} onChange={e => setStartTime(e.target.value)} />
+          </div>
+        </div>
+
+        <div>
+          <label className="label font-semibold py-0">Due Date</label>
+          <div className="flex gap-2 mt-1">
+            <input type="date" className="input input-bordered flex-1 min-w-0" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            <input type="time" className="input input-bordered w-28" value={dueTime} onChange={e => setDueTime(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      <div className="relative space-y-2">
+        <label className="label font-semibold py-0">Link to Deal (Optional)</label>
         <input
           type="text"
           placeholder="Search Deals..."
@@ -151,22 +170,22 @@ export default function AddTaskForm() {
           value={dealQuery}
           onChange={e => {
             setDealQuery(e.target.value)
-            setSelectedDeal(null)
+            if (e.target.value === '') setSelectedDeal(null)
           }}
         />
-        {dealResults.length > 0 && (
-          <ul className="border bg-base-100 absolute w-full z-10 max-h-48 overflow-y-auto">
+        {dealResults.length > 0 && dealQuery && !selectedDeal && (
+          <ul className="absolute z-20 w-full bg-base-100 border border-base-200 shadow-lg rounded-lg max-h-48 overflow-y-auto mt-1">
             {dealResults.map(d => (
               <li
                 key={d.id}
-                className="hover:bg-base-200 p-2 cursor-pointer"
+                className="hover:bg-primary/10 p-2 cursor-pointer text-sm"
                 onClick={() => {
                   setSelectedDeal(d)
                   setDealQuery(d.title)
                   setDealResults([])
-
-                  // Optionally, you can also set selected contacts based on the deal
-                  setSelectedContacts(d.contacts || [])
+                  if (d.contacts && selectedContacts.length === 0) {
+                    setSelectedContacts(d.contacts)
+                  }
                 }}
               >
                 {d.title}
@@ -176,17 +195,14 @@ export default function AddTaskForm() {
         )}
       </div>
 
-      {/* Contact Search */}
       <ContactMultiSelect
         contacts={contactOptions}
         selected={selectedContacts}
         onChange={(newSelected) => setSelectedContacts(newSelected)}
       />
       
-
-      {/* Submit */}
-      <button type="submit" className={`btn btn-primary w-full ${loading ? 'loading' : ''}`} disabled={loading}>
-        {loading ? 'Adding...' : 'Add Task'}
+      <button type="submit" className={`btn btn-primary w-full mt-4 ${loading ? 'loading' : ''}`} disabled={loading}>
+        {loading ? 'Adding...' : 'Create Task'}
       </button>
     </form>
   )

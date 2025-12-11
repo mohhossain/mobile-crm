@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   EllipsisHorizontalIcon, 
-  ArrowRightIcon,
-  ArrowsRightLeftIcon
+  CalendarIcon
 } from "@heroicons/react/24/outline";
 
 interface Deal {
@@ -15,25 +14,30 @@ interface Deal {
   amount: number;
   status: string;
   updatedAt: Date | string;
+  closeDate?: Date | string | null;
   probability?: number;
   contacts: { id: string; name: string; imageUrl?: string }[];
   tags: { name: string }[];
 }
 
-const STAGES = ['OPEN', 'NEGOTIATION', 'PENDING', 'WON'];
+// UPDATED STAGES
+const STAGES = ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
 
+// Updated Colors
 const STATUS_COLORS: Record<string, string> = {
-  OPEN: 'border-primary text-primary',
+  NEW: 'border-base-content/20 text-base-content',
+  QUALIFIED: 'border-primary text-primary',
+  PROPOSAL: 'border-secondary text-secondary',
   NEGOTIATION: 'border-info text-info',
-  PENDING: 'border-warning text-warning',
   WON: 'border-success text-success',
   LOST: 'border-error text-error'
 };
 
 const STATUS_BG: Record<string, string> = {
-  OPEN: 'bg-primary/5',
+  NEW: 'bg-base-content/5',
+  QUALIFIED: 'bg-primary/5',
+  PROPOSAL: 'bg-secondary/5',
   NEGOTIATION: 'bg-info/5',
-  PENDING: 'bg-warning/5',
   WON: 'bg-success/5',
   LOST: 'bg-error/5'
 };
@@ -45,7 +49,6 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Group deals by status
   const columns = STAGES.map(stage => ({
     id: stage,
     title: stage.charAt(0) + stage.slice(1).toLowerCase(),
@@ -53,7 +56,6 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
     total: deals.filter(d => d.status === stage).reduce((sum, d) => sum + d.amount, 0)
   }));
 
-  // Scroll to column on mobile tab click
   const scrollToColumn = (stage: string) => {
     setActiveMobileTab(stage);
     const el = columnRefs.current[stage];
@@ -61,21 +63,17 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
       const containerLeft = containerRef.current.getBoundingClientRect().left;
       const elLeft = el.getBoundingClientRect().left;
       const offset = elLeft - containerLeft + containerRef.current.scrollLeft;
-      
-      // Center logic for mobile view
-      // We want the column to be centered or slightly padded from left
-      containerRef.current.scrollTo({ left: offset - 16, behavior: 'smooth' }); // 16px padding
+      containerRef.current.scrollTo({ left: offset - 16, behavior: 'smooth' });
     }
   };
 
-  // Handle Drag & Drop (Desktop)
   const handleDragStart = (e: React.DragEvent, dealId: string) => {
     e.dataTransfer.setData("dealId", dealId);
     e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault(); // Necessary to allow dropping
+    e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
 
@@ -83,18 +81,25 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
     e.preventDefault();
     const dealId = e.dataTransfer.getData("dealId");
     if (!dealId) return;
-
-    // Optimistic update or loading state could go here
     await handleMove(dealId, newStatus);
   };
 
   const handleMove = async (dealId: string, newStatus: string) => {
     setMovingId(dealId);
     try {
+      // Auto-set probability based on stage
+      let prob = undefined;
+      if (newStatus === 'WON') prob = 100;
+      if (newStatus === 'LOST') prob = 0;
+      if (newStatus === 'NEGOTIATION') prob = 75;
+      if (newStatus === 'PROPOSAL') prob = 50;
+      if (newStatus === 'QUALIFIED') prob = 25;
+      if (newStatus === 'NEW') prob = 10;
+
       const res = await fetch(`/api/deals/${dealId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, probability: newStatus === 'WON' ? 100 : undefined })
+        body: JSON.stringify({ status: newStatus, probability: prob })
       });
       if (res.ok) router.refresh();
     } catch (e) {
@@ -104,17 +109,8 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
     }
   };
 
-  // Track scroll to update active mobile tab
-  const handleScroll = () => {
-    if (!containerRef.current) return;
-    // Simple logic: which column is closest to left edge
-    // This is a basic implementation, can be refined with IntersectionObserver
-  };
-
   return (
     <div className="flex flex-col h-full">
-      
-      {/* Mobile Navigation Tabs */}
       <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-2 px-1 mb-4 sticky top-0 z-20 bg-base-300/95 backdrop-blur py-2">
         {STAGES.map(stage => (
           <button
@@ -132,10 +128,8 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
         ))}
       </div>
 
-      {/* Kanban Container */}
       <div 
         ref={containerRef}
-        onScroll={handleScroll}
         className="flex-1 flex overflow-x-auto snap-x snap-mandatory gap-4 px-1 pb-4 no-scrollbar lg:gap-6 lg:overflow-hidden"
       >
         {columns.map((col) => (
@@ -146,11 +140,9 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, col.id)}
           >
-            
-            {/* Column Header */}
-            <div className={`p-3 border-b border-base-200 flex justify-between items-center rounded-t-2xl bg-base-100/50 backdrop-blur-sm sticky top-0 z-10 border-t-4 ${STATUS_COLORS[col.id].split(' ')[0]}`}>
+            <div className={`p-3 border-b border-base-200 flex justify-between items-center rounded-t-2xl bg-base-100/50 backdrop-blur-sm sticky top-0 z-10 border-t-4 ${STATUS_COLORS[col.id]?.split(' ')[0] || 'border-base-300'}`}>
               <div className="flex items-center gap-2">
-                <h3 className={`font-black text-sm tracking-tight ${STATUS_COLORS[col.id].split(' ')[1]}`}>
+                <h3 className={`font-black text-sm tracking-tight ${STATUS_COLORS[col.id]?.split(' ')[1] || ''}`}>
                   {col.title}
                 </h3>
                 <span className="badge badge-xs badge-ghost font-mono">{col.items.length}</span>
@@ -160,7 +152,6 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
               </div>
             </div>
 
-            {/* Drop Zone / List */}
             <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
               {col.items.length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-base-content/20 text-xs italic min-h-[150px] border-2 border-dashed border-base-content/5 rounded-xl m-2">
@@ -179,13 +170,11 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
                   `}
                 >
                   <div className="card-body p-3 gap-1.5">
-                    {/* Card Top */}
                     <div className="flex justify-between items-start">
                       <Link href={`/deals/${deal.id}`} className="font-bold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
                         {deal.title}
                       </Link>
                       
-                      {/* Quick Move (Mobile Friendly) */}
                       <div className="dropdown dropdown-end lg:hidden">
                         <div tabIndex={0} role="button" className="btn btn-xs btn-ghost btn-circle -mt-1 -mr-1">
                           <EllipsisHorizontalIcon className="w-4 h-4" />
@@ -203,13 +192,11 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
                       </div>
                     </div>
 
-                    {/* Card Amount */}
                     <div className="text-base font-black tracking-tight flex items-center gap-2">
                        ${deal.amount.toLocaleString()}
                        {col.id === 'WON' && <span className="badge badge-xs badge-success badge-outline">Paid</span>}
                     </div>
 
-                    {/* Card Bottom: Avatars & Date */}
                     <div className="flex justify-between items-end mt-1 pt-2 border-t border-base-content/5">
                       <div className="flex -space-x-1.5">
                          {deal.contacts.slice(0, 2).map(c => (
@@ -222,8 +209,13 @@ export default function DealsKanban({ deals }: { deals: Deal[] }) {
                            </div>
                          ))}
                       </div>
-                      <span className="text-[9px] opacity-40 font-mono">
-                         {new Date(deal.updatedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})}
+                      
+                      <span className={`text-[9px] font-mono flex items-center gap-1 ${deal.closeDate ? 'text-primary' : 'opacity-40'}`}>
+                         <CalendarIcon className="w-3 h-3" />
+                         {deal.closeDate 
+                            ? new Date(deal.closeDate).toLocaleDateString(undefined, {month:'short', day:'numeric'})
+                            : new Date(deal.updatedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})
+                         }
                       </span>
                     </div>
                   </div>

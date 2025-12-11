@@ -24,7 +24,8 @@ export async function GET(
       contacts: true,
       tasks: { orderBy: { dueDate: 'asc' }, include: { deal: true } },
       notes: { orderBy: { createdAt: 'desc' } },
-      expenses: { orderBy: { date: 'desc' } } // Ensure expenses are included
+      expenses: { orderBy: { date: 'desc' } },
+      lineItems: true
     }
   })
   
@@ -41,17 +42,22 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { title, amount, status, closeDate, contactIds, probability } = body
+  
+  // Destructure new roadmap field
+  const { title, amount, status, closeDate, contactIds, probability, roadmap } = body
 
   try {
     const updatedDeal = await prisma.deal.update({
       where: { id, userId: user.id },
       data: {
-        title,
-        amount,
-        status,
-        probability,
+        ...(title && { title }),
+        ...(amount !== undefined && { amount: parseFloat(amount) }),
+        ...(status && { status }),
+        ...(probability !== undefined && { probability }),
         ...(closeDate !== undefined && { closeDate: toSafeDate(closeDate) }),
+        // Update Roadmap if provided
+        ...(roadmap && { roadmap }),
+        
         ...(contactIds && {
           contacts: {
             set: [], 
@@ -59,7 +65,7 @@ export async function PUT(
           }
         })
       },
-      include: { contacts: true }
+      include: { contacts: true, expenses: true, tasks: true, notes: true }
     })
 
     return NextResponse.json({ success: true, deal: updatedDeal })

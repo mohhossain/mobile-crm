@@ -13,8 +13,9 @@ import {
   PhotoIcon
 } from "@heroicons/react/24/outline";
 
+// FIX: Updated interface to allow passing the contact object back
 interface AddLeadsProps {
-  onSuccess?: (contact: any) => void;
+  onSuccess?: (contact: any) => void; 
   onCancel?: () => void;
 }
 
@@ -23,9 +24,8 @@ const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   
-  // Context Info
   const [jobTitle, setJobTitle] = useState("");
-  const [company, setCompany] = useState(""); // This string will be sent to API to create/link Company
+  const [company, setCompany] = useState("");
   const [location, setLocation] = useState("");
   
   const [tags, setTags] = useState<string[]>([]);
@@ -73,11 +73,16 @@ const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
 
       const data = await response.json();
       
+      // Reset form
       setName(""); setEmail(""); setPhone("");
       setJobTitle(""); setCompany(""); setLocation("");
       setTags([]); setImage(null); setImagePreview(null);
 
-      onSuccess?.(data.contact);
+      // Pass the new contact data back to the parent
+      if (onSuccess) {
+        onSuccess(data.contact);
+      }
+      
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -88,7 +93,7 @@ const AddLeads: React.FC<AddLeadsProps> = ({ onSuccess, onCancel }) => {
   };
 
   return (
-    <form className="space-y-6 p-1" onSubmit={handleSubmit}>
+    <form className="space-y-6 p-1 pb-32" onSubmit={handleSubmit}>
       
       {/* Avatar Upload */}
       <div className="flex justify-center">

@@ -15,7 +15,7 @@ model User {
   googleAccessToken  String?
   googleRefreshToken String?
   
-  // NEW: Public Profile Fields (Ensure these exist!)
+  // NEW: Public Profile Fields
   username           String?   @unique
   bio                String?
   website            String?
@@ -34,6 +34,7 @@ model User {
   notes              Note[]
   meetings           Meeting[]
   expenses           Expense[]
+  invoices           Invoice[] // Added missing relation
 }
 
 model Gig {
@@ -114,16 +115,41 @@ model DealLineItem {
   product     Product? @relation(fields: [productId], references: [id])
 }
 
+model Invoice {
+  id          String        @id @default(uuid())
+  number      String
+  status      InvoiceStatus @default(DRAFT)
+  issueDate   DateTime      @default(now())
+  dueDate     DateTime
+  amount      Float
+  
+  dealId      String
+  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade) // Moved cascade here
+  
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  
+  items       Json
+  
+  stripeSessionId String?
+  paymentLink     String?
+  paidAt          DateTime?
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
 model Deal {
   id            String        @id @default(uuid())
   title         String
   amount        Float
   status        DealStatus
   probability   Int           @default(50)
-  invoiceStatus InvoiceStatus @default(NONE)
   paymentTerms  String?       @default("Net 30")
+  
   shareToken    String?       @unique @default(uuid())
   portalViews   Int           @default(0)
+  
   gigId         String?
   gig           Gig?          @relation(fields: [gigId], references: [id])
   userId        String
@@ -131,12 +157,16 @@ model Deal {
   contacts      Contact[]     @relation("ContactDeals")
   companyId     String?
   company       Company?      @relation(fields: [companyId], references: [id])
+
   lineItems     DealLineItem[]
+  invoices      Invoice[]
+  
   tags          Tag[]         @relation("TagDeals")
   tasks         Task[]
   notes         Note[]
   meetings      Meeting[]
   expenses      Expense[]
+  
   closeDate     DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
@@ -242,7 +272,9 @@ enum DealStatus {
   LOST
   CANCELLED
   NEGOTIATION
-  OPEN
+  NEW
+  QUALIFIED
+  PROPOSAL
 }
 
 enum LeadStatus {

@@ -12,15 +12,28 @@ import {
 import AddDeals from "./AddDeals";
 import AddTasks from "./AddTasks";
 import AddLeads from "./AddLeads";
+import AddExpense from "./AddExpense"; // New Import
 
 export default function HomeActions() {
-  // Modal State
-  const [activeModal, setActiveModal] = useState<'DEAL' | 'TASK' | 'CONTACT' | null>(null);
+  const [activeModal, setActiveModal] = useState<'DEAL' | 'TASK' | 'CONTACT' | 'EXPENSE' | null>(null);
+
+  // Helper to close dropdown when an item is clicked
+  const closeDropdown = () => {
+    const elem = document.activeElement;
+    if (elem instanceof HTMLElement) {
+      elem.blur();
+    }
+  };
+
+  const openModal = (modal: typeof activeModal) => {
+    setActiveModal(modal);
+    closeDropdown();
+  };
 
   return (
     <div className="flex gap-3 items-center">
       
-      {/* 1. QUICK ACTION DROPDOWN (+) */}
+      {/* QUICK ACTION DROPDOWN (+) */}
       <div className="dropdown dropdown-end">
         <div tabIndex={0} role="button" className="btn btn-primary btn-sm gap-2 shadow-lg shadow-primary/20 rounded-full px-4">
           <PlusIcon className="w-4 h-4" />
@@ -28,30 +41,30 @@ export default function HomeActions() {
         </div>
         <ul tabIndex={0} className="dropdown-content z-[100] menu p-2 shadow-xl bg-base-100 rounded-box w-52 border border-base-200 mt-2">
           <li>
-            <button onClick={() => setActiveModal('DEAL')} className="gap-3 py-3">
+            <button onClick={() => openModal('DEAL')} className="gap-3 py-3">
               <BriefcaseIcon className="w-4 h-4 text-primary" /> New Deal
             </button>
           </li>
           <li>
-            <button onClick={() => setActiveModal('TASK')} className="gap-3 py-3">
+            <button onClick={() => openModal('TASK')} className="gap-3 py-3">
               <ClipboardDocumentCheckIcon className="w-4 h-4 text-secondary" /> New Task
             </button>
           </li>
           <li>
-            <button onClick={() => setActiveModal('CONTACT')} className="gap-3 py-3">
+            <button onClick={() => openModal('CONTACT')} className="gap-3 py-3">
               <UserPlusIcon className="w-4 h-4 text-accent" /> New Contact
             </button>
           </li>
           <div className="divider my-0"></div>
           <li>
-            <Link href="/finance" className="gap-3 py-3 text-base-content/60">
+            <button onClick={() => openModal('EXPENSE')} className="gap-3 py-3 text-base-content/60">
               <BanknotesIcon className="w-4 h-4" /> Log Expense
-            </Link>
+            </button>
           </li>
         </ul>
       </div>
 
-      {/* 2. MODALS */}
+      {/* MODALS */}
       
       {/* Add Deal Modal */}
       {activeModal === 'DEAL' && (
@@ -91,6 +104,18 @@ export default function HomeActions() {
               <h3 className="font-bold text-lg mb-4">New Contact</h3>
               <button onClick={() => setActiveModal(null)} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
               <AddLeads onSuccess={() => setActiveModal(null)} onCancel={() => setActiveModal(null)} />
+           </div>
+           <div className="modal-backdrop" onClick={() => setActiveModal(null)}></div>
+        </dialog>
+      )}
+
+      {/* Add Expense Modal */}
+      {activeModal === 'EXPENSE' && (
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-50">
+           <div className="modal-box p-6 bg-base-100">
+              <h3 className="font-bold text-lg mb-4">Log Expense</h3>
+              <button onClick={() => setActiveModal(null)} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+              <AddExpense onSuccess={() => setActiveModal(null)} onCancel={() => setActiveModal(null)} />
            </div>
            <div className="modal-backdrop" onClick={() => setActiveModal(null)}></div>
         </dialog>
