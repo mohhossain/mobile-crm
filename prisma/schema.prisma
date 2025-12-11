@@ -115,29 +115,6 @@ model DealLineItem {
   product     Product? @relation(fields: [productId], references: [id])
 }
 
-model Invoice {
-  id          String        @id @default(uuid())
-  number      String
-  status      InvoiceStatus @default(DRAFT)
-  issueDate   DateTime      @default(now())
-  dueDate     DateTime
-  amount      Float
-  
-  dealId      String
-  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade) // Moved cascade here
-  
-  userId      String
-  user        User          @relation(fields: [userId], references: [id])
-  
-  items       Json
-  
-  stripeSessionId String?
-  paymentLink     String?
-  paidAt          DateTime?
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-}
 
 model Deal {
   id            String        @id @default(uuid())
@@ -170,6 +147,31 @@ model Deal {
   closeDate     DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
+}
+
+
+model Invoice {
+  id          String        @id @default(uuid())
+  number      String
+  status      InvoiceStatus @default(DRAFT)
+  issueDate   DateTime      @default(now())
+  dueDate     DateTime
+  amount      Float
+  
+  dealId      String
+  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade) // Moved cascade here
+  
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  
+  items       Json
+  
+  stripeSessionId String?
+  paymentLink     String?
+  paidAt          DateTime?
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model Service {
@@ -267,7 +269,6 @@ enum TaskStatus {
 }
 
 enum DealStatus {
-  PENDING
   WON
   LOST
   CANCELLED

@@ -5,16 +5,18 @@ import {
   ClockIcon, 
   DocumentCheckIcon,
   CalendarDaysIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as SolidCheck } from "@heroicons/react/24/solid";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import InvoicePDF from "./InvoicePDF";
 
 export default function ClientPortalView({ deal, owner }: { deal: any, owner: any }) {
   
   const STAGES = ['OPEN', 'NEGOTIATION', 'PENDING', 'WON'];
   const currentStageIndex = STAGES.indexOf(deal.status);
-  
-  // Calculate Progress
   const progress = Math.max(5, ((currentStageIndex + 1) / STAGES.length) * 100);
 
   return (
@@ -39,7 +41,6 @@ export default function ClientPortalView({ deal, owner }: { deal: any, owner: an
 
       {/* 2. Project Status Card */}
       <div className="card bg-base-100 shadow-xl border border-base-200 overflow-hidden">
-        {/* Status Bar */}
         <div className="bg-base-200 px-6 py-4 border-b border-base-300 flex justify-between items-center">
            <span className="text-xs font-bold uppercase tracking-widest opacity-50">Project</span>
            <span className={`badge ${deal.status === 'WON' ? 'badge-success' : 'badge-primary'}`}>
@@ -54,7 +55,6 @@ export default function ClientPortalView({ deal, owner }: { deal: any, owner: an
             <span>Updated: {new Date(deal.updatedAt).toLocaleDateString()}</span>
           </div>
 
-          {/* Visual Pipeline */}
           <div className="relative mb-8">
             <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-base-200">
               <div style={{ width: `${progress}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary transition-all duration-1000"></div>
@@ -66,7 +66,6 @@ export default function ClientPortalView({ deal, owner }: { deal: any, owner: an
             </div>
           </div>
 
-          {/* Metrics Grid */}
           <div className="grid grid-cols-2 gap-4 border-t border-base-200 pt-6">
             <div>
                <div className="text-xs uppercase font-bold opacity-40 mb-1">Target Date</div>
@@ -84,7 +83,53 @@ export default function ClientPortalView({ deal, owner }: { deal: any, owner: an
         </div>
       </div>
 
-      {/* 3. Tasks / Deliverables */}
+      {/* 3. NEW: Invoices Section */}
+      {deal.invoices && deal.invoices.length > 0 && (
+        <div className="card bg-base-100 shadow-sm border border-base-200">
+          <div className="card-body p-0">
+             <div className="px-6 py-4 border-b border-base-200 flex items-center gap-2">
+                <DocumentTextIcon className="w-5 h-5 text-secondary" />
+                <h3 className="font-bold">Invoices</h3>
+             </div>
+             <div className="divide-y divide-base-200">
+               {deal.invoices.map((inv: any) => (
+                 <div key={inv.id} className="p-4 flex items-center justify-between hover:bg-base-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2 bg-base-200 rounded-lg">
+                         <CurrencyDollarIcon className="w-5 h-5 opacity-60" />
+                       </div>
+                       <div>
+                         <div className="font-bold text-sm">{inv.number}</div>
+                         <div className="text-xs opacity-50">Due: {new Date(inv.dueDate).toLocaleDateString()}</div>
+                       </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                       <div className="text-right mr-2">
+                         <div className="font-bold">${inv.amount.toLocaleString()}</div>
+                         <span className={`badge badge-xs ${inv.status === 'PAID' ? 'badge-success' : 'badge-warning'}`}>
+                           {inv.status}
+                         </span>
+                       </div>
+                       
+                       <PDFDownloadLink
+                         document={<InvoicePDF deal={deal} user={owner} />}
+                         fileName={`invoice-${inv.number}.pdf`}
+                         className="btn btn-sm btn-ghost btn-square"
+                         title="Download PDF"
+                       >
+                         {/* @ts-ignore */}
+                         {({ loading }) => (loading ? '...' : <ArrowDownTrayIcon className="w-5 h-5" />)}
+                       </PDFDownloadLink>
+                    </div>
+                 </div>
+               ))}
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Tasks / Deliverables */}
       {deal.tasks && deal.tasks.length > 0 && (
         <div className="card bg-base-100 shadow-sm border border-base-200">
           <div className="card-body p-0">

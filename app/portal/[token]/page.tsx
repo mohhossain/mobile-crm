@@ -2,13 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import ClientPortalView from "@/app/components/ClientPortalView";
 
-// Force dynamic rendering to ensure up-to-date status
 export const dynamic = 'force-dynamic';
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
-  // 1. Find Deal by Share Token
   const deal = await prisma.deal.findUnique({
     where: { shareToken: token },
     include: {
@@ -17,9 +15,13 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       },
       contacts: true,
       lineItems: true,
-      // Only fetch tasks that are relevant (e.g. not private notes disguised as tasks)
-      // For v1.3, we show all tasks, or you can filter by isPublic if you implement that toggle later
+      // FIX: Include Invoices for the client to see
+      invoices: {
+        where: { status: { not: 'DRAFT' } }, // Only show SENT/PAID/OVERDUE invoices
+        orderBy: { issueDate: 'desc' }
+      },
       tasks: {
+        // Only show public tasks (if you implemented isPublic), or all for now
         orderBy: { dueDate: 'asc' }
       }
     }
@@ -27,7 +29,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   if (!deal) return notFound();
 
-  // 2. Increment View Counter (Simple Analytics)
+  // Increment View Counter
   await prisma.deal.update({
     where: { id: deal.id },
     data: { portalViews: { increment: 1 } }

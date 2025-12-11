@@ -80,7 +80,7 @@ const AddDeals = () => {
   const [title, setTitle] = useState("");
   const [isTitleManuallyEdited, setIsTitleManuallyEdited] = useState(false);
 
-  const [status, setStatus] = useState("OPEN");
+  const [status, setStatus] = useState("NEW");
   const [closeDateDate, setCloseDateDate] = useState("");
   const [closeDateTime, setCloseDateTime] = useState("");
 
@@ -525,10 +525,13 @@ const AddDeals = () => {
                 <div className="form-control">
                   <label className="label font-medium text-sm">Pipeline Stage</label>
                   <select className="select select-bordered w-full rounded-md" value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="OPEN">Open</option>
-                    <option value="NEGOTIATION">Negotiation</option>
-                    <option value="PENDING">Pending</option>
+                    <option value="NEW">New</option>
+                    <option value="QUALIFIED">Qualified</option>
+                    <option value="PROPOSAL">Proposal Sent</option>
                     <option value="WON">Won</option>
+                    <option value="LOST">Lost</option>
+                    <option value="NEGOTIATION">Negotiation</option>
+                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
 

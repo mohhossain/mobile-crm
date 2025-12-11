@@ -25,7 +25,8 @@ export async function GET(
       tasks: { orderBy: { dueDate: 'asc' }, include: { deal: true } },
       notes: { orderBy: { createdAt: 'desc' } },
       expenses: { orderBy: { date: 'desc' } },
-      lineItems: true
+      lineItems: true,
+      invoices: { orderBy: { createdAt: 'desc' } }
     }
   })
   
@@ -33,6 +34,7 @@ export async function GET(
   return NextResponse.json(deal)
 }
 
+// FIX: Ensure PUT is exported to handle status changes
 export async function PUT(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -42,8 +44,6 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  
-  // Destructure new roadmap field
   const { title, amount, status, closeDate, contactIds, probability, roadmap } = body
 
   try {
@@ -55,7 +55,6 @@ export async function PUT(
         ...(status && { status }),
         ...(probability !== undefined && { probability }),
         ...(closeDate !== undefined && { closeDate: toSafeDate(closeDate) }),
-        // Update Roadmap if provided
         ...(roadmap && { roadmap }),
         
         ...(contactIds && {
@@ -65,12 +64,12 @@ export async function PUT(
           }
         })
       },
-      include: { contacts: true, expenses: true, tasks: true, notes: true }
+      include: { contacts: true, expenses: true, tasks: true, notes: true, invoices: true }
     })
 
     return NextResponse.json({ success: true, deal: updatedDeal })
   } catch (err) {
-    console.error(err)
+    console.error("Update Deal Error:", err)
     return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 })
   }
 }

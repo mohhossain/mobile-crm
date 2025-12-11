@@ -3,12 +3,12 @@ import { prisma } from '@/lib/prisma';
 import BackButton from '@/app/components/BackButton';
 import DealDashboard from '@/app/components/DealDashboard';
 
-export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DealPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams: Promise<{ tab?: string }> }) {
   const user = await getCurrentUser();
   const { id } = await params;
+  const { tab } = await searchParams; // Grab tab from URL
 
   if (!user) return <div className="p-4 text-center">Unauthorized.</div>;
-  if (!id) return <div className="p-4 text-center">Invalid Deal ID</div>;
 
   const deal = await prisma.deal.findUnique({
     where: { id, userId: user.id },
@@ -19,11 +19,16 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         include: { deal: true }
       },
       notes: {
-        orderBy: { createdAt: 'asc' } 
+        orderBy: { createdAt: 'desc' } 
       },
-      expenses: { orderBy: { date: 'desc' } },
-      contacts: true
-
+      contacts: true,
+      expenses: {
+        orderBy: { date: 'desc' }
+      },
+      // CRITICAL FIX: Ensure Invoices are fetched
+      invoices: {
+        orderBy: { createdAt: 'desc' }
+      }
     },
   });
 
@@ -32,9 +37,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="p-4">
       <BackButton />
-      {/* Spacer for BackButton */}
       <div className="h-8"></div> 
-      <DealDashboard deal={deal} />
+      {/* Pass the tab param to set active tab automatically */}
+      <DealDashboard deal={deal} initialTab={tab} />
     </div>
   );
 }
