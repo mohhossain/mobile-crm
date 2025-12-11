@@ -12,31 +12,31 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   const { q } = await searchParams;
 
   const contacts = await prisma.contact.findMany({
-     where: {
-       userId: user.id,
-       ...(q ? {
-         OR: [
-           { name: { contains: q, mode: 'insensitive' } },
-           { email: { contains: q, mode: 'insensitive' } },
-           { companyName: { contains: q, mode: 'insensitive' } },
-           { company: { name: { contains: q, mode: 'insensitive' } } }
-         ]
-       } : {})
-     },
-     include: { 
-       tags: true,
-       company: true 
-     },
-     orderBy: { createdAt: 'desc' }
+      where: {
+        userId: user.id,
+        ...(q ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { companyName: { contains: q, mode: 'insensitive' } },
+            { company: { name: { contains: q, mode: 'insensitive' } } }
+          ]
+        } : {})
+      },
+      include: { 
+        tags: true,
+        company: true 
+      },
+      orderBy: { createdAt: 'desc' }
   });
 
-  // FIX: Removed manual type annotation on 'contact' argument. 
-  // We let TypeScript infer the type directly from the 'contacts' array above.
-  const formattedContacts = contacts.map((contact: { company: { name: any; }; companyName: any; tags: any[]; }) => ({
+  // FIX: Use 'any' here to prevent TypeScript from complaining about the structure mismatch
+  // between the Prisma return type and the expected shape in the map function.
+  const formattedContacts = contacts.map((contact: any) => ({
     ...contact,
     // Flatten: Use the relation name if available, fallback to legacy string
     company: contact.company?.name || contact.companyName || null,
-    tags: contact.tags.map(t => ({ id: t.id, name: t.name }))
+    tags: contact.tags.map((t: any) => ({ id: t.id, name: t.name }))
   }));
 
   return (
