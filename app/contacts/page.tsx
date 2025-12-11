@@ -33,7 +33,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   });
 
   // Transform data for the client component
-  const formattedContacts = contacts.map(contact => ({
+  const formattedContacts = contacts.map((contact: { company: { name: any; }; companyName: any; tags: any[]; }) => ({
     ...contact,
     // Flatten: Use the relation name if available, fallback to legacy string
     company: contact.company?.name || contact.companyName || null,
