@@ -18,21 +18,20 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
          OR: [
            { name: { contains: q, mode: 'insensitive' } },
            { email: { contains: q, mode: 'insensitive' } },
-           // FIX 1: Search the legacy string field (if you kept it)
            { companyName: { contains: q, mode: 'insensitive' } },
-           // FIX 2: Search the relation correctly (nested name check)
            { company: { name: { contains: q, mode: 'insensitive' } } }
          ]
        } : {})
      },
      include: { 
        tags: true,
-       company: true // Include the relation so we can display the name
+       company: true 
      },
      orderBy: { createdAt: 'desc' }
   });
 
-  // Transform data for the client component
+  // FIX: Removed manual type annotation on 'contact' argument. 
+  // We let TypeScript infer the type directly from the 'contacts' array above.
   const formattedContacts = contacts.map((contact: { company: { name: any; }; companyName: any; tags: any[]; }) => ({
     ...contact,
     // Flatten: Use the relation name if available, fallback to legacy string
