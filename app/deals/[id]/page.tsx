@@ -39,7 +39,7 @@ export default async function DealPage({ params, searchParams }: { params: Promi
       <BackButton />
       <div className="h-8"></div> 
       {/* Pass the tab param to set active tab automatically */}
-      <DealDashboard deal={deal} initialTab={tab} />
+      <DealDashboard deal={deal} initialTab={tab} user={user}/>
     </div>
   );
 }

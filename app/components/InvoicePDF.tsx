@@ -1,264 +1,168 @@
-import React from 'react';
-import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
+"use client";
 
-// Register a standard font if needed, otherwise Helvetica is default
-// Font.register({ family: 'Roboto', src: 'https://...' });
-
-const styles = StyleSheet.create({
-  page: {
-    flexDirection: 'column',
-    backgroundColor: '#FFFFFF',
-    padding: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 10,
-    color: '#1F2937', // Gray-800
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingBottom: 20,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827', // Gray-900
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 10,
-    color: '#6B7280', // Gray-500
-  },
-  // Section Grid
-  sectionGrid: {
-    flexDirection: 'row',
-    marginBottom: 30,
-    gap: 20,
-  },
-  colLeft: {
-    width: '50%',
-  },
-  colRight: {
-    width: '50%',
-  },
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#9CA3AF', // Gray-400
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  textLg: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  textBase: {
-    marginBottom: 2,
-    color: '#4B5563',
-  },
-  
-  // Table
-  table: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 4,
-    marginBottom: 20,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    padding: 8,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    padding: 8,
-    minHeight: 30, // Ensure row has height
-  },
-  // Columns
-  colDesc: { 
-    width: '50%', 
-    paddingRight: 8 
-  },
-  colQty: { 
-    width: '15%', 
-    textAlign: 'center' 
-  },
-  colPrice: { 
-    width: '15%', 
-    textAlign: 'right' 
-  },
-  colTotal: { 
-    width: '20%', 
-    textAlign: 'right' 
-  },
-  
-  // Totals
-  totalSection: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: 200,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  totalLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#374151',
-  },
-  totalValue: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#2563EB', // Blue-600 (Pulse brand color)
-  },
-  
-  // Footer
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    textAlign: 'center',
-    color: '#9CA3AF',
-    fontSize: 9,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 10,
-  }
-});
+import { useEffect } from "react";
 
 interface InvoiceProps {
   deal: any;
   user: any;
 }
 
-const InvoicePDF = ({ deal, user }: InvoiceProps) => {
+export default function InvoicePDF({ deal, user }: InvoiceProps) {
+  // Safety check
+  if (!deal || !user) {
+    return <div className="p-4 text-red-500">Error: Missing invoice data.</div>;
+  }
+
   const contact = deal.contacts?.[0] || {};
-  const invoiceDate = new Date().toLocaleDateString();
-  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+  
+  // 1. Use the specific invoice number if passed, otherwise fallback to deal id
+  const invoiceNumber = deal.invoiceNumber || deal.id?.slice(0, 8).toUpperCase() || '0000';
 
-  // FIX 1: Ensure we have data even if lineItems is missing
-  // FIX 2: Ensure the description field is actually mapped
-  const items = deal.lineItems && deal.lineItems.length > 0 
-    ? deal.lineItems 
-    : [{ 
-        name: deal.title || 'Service', 
-        description: deal.description || '', // Ensure this exists
-        quantity: 1, 
-        price: deal.amount || 0 
-      }];
+  // 2. Use specific dates from the invoice if available
+  const invoiceDate = deal.issueDate 
+    ? new Date(deal.issueDate).toLocaleDateString() 
+    : new Date().toLocaleDateString();
 
-  const formatCurrency = (amount: number) => {
-    return `$${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const dueDateString = deal.dueDate
+    ? new Date(deal.dueDate).toLocaleDateString()
+    : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+
+  // Ensure line items exist
+  const items = deal.lineItems && deal.lineItems.length > 0 ? deal.lineItems : [
+    { 
+      name: deal.title || 'Service', 
+      description: deal.description || '', 
+      quantity: 1, 
+      price: deal.amount || 0
+    }
+  ];
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>INVOICE</Text>
-            <Text style={styles.subtitle}>#{deal.id ? deal.id.slice(0, 8).toUpperCase() : 'DRAFT'}</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.textLg}>{user.name || 'Your Company'}</Text>
-            <Text style={styles.textBase}>{user.email || 'hello@example.com'}</Text>
-          </View>
-        </View>
+    <>
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body { visibility: hidden; }
+          #printable-invoice, #printable-invoice * { visibility: visible; }
+          #printable-invoice {
+            position: absolute;
+            left: 0; top: 0; width: 100%;
+            margin: 0; padding: 0;
+            background: white;
+            box-shadow: none;
+          }
+          .print\\:hidden { display: none !important; }
+        }
+      `}} />
 
-        {/* Bill To & Details Grid */}
-        <View style={styles.sectionGrid}>
-          <View style={styles.colLeft}>
-            <Text style={styles.sectionTitle}>Bill To</Text>
-            <Text style={styles.textLg}>{contact.name || 'Valued Client'}</Text>
-            {contact.company && <Text style={styles.textBase}>{contact.company}</Text>}
-            <Text style={styles.textBase}>{contact.email}</Text>
-          </View>
-          <View style={styles.colRight}>
-            <Text style={styles.sectionTitle}>Details</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={styles.textBase}>Date Issued:</Text>
-              <Text style={{ fontWeight: 'bold' }}>{invoiceDate}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={styles.textBase}>Due Date:</Text>
-              <Text style={{ fontWeight: 'bold' }}>{dueDate}</Text>
-            </View>
-          </View>
-        </View>
+      <div id="printable-invoice" className="w-full max-w-[210mm] mx-auto bg-white p-10 md:p-12 text-gray-900 font-sans shadow-lg my-8 print:shadow-none print:m-0 print:w-full print:max-w-none border border-gray-100">
+        
+        {/* Print Controls */}
+        <div className="print:hidden mb-8 flex flex-col sm:flex-row justify-between items-center bg-gray-50 p-4 rounded-lg border border-gray-200 gap-4">
+          <p className="text-sm text-gray-600 text-center sm:text-left">
+            To save as PDF, click the button and select <strong>"Save as PDF"</strong> as the destination.
+          </p>
+          <button 
+            onClick={handlePrint}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded shadow-sm flex items-center transition-colors whitespace-nowrap"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Download / Print
+          </button>
+        </div>
+
+        {/* Header */}
+        <div className="flex justify-between items-start border-b border-gray-200 pb-8 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-wider text-gray-900 uppercase mb-2">Invoice</h1>
+            <p className="text-sm text-gray-500 font-mono">#{invoiceNumber}</p>
+          </div>
+          <div className="text-right">
+            <h2 className="text-xl font-bold text-gray-900">{user.name || 'Your Company'}</h2>
+            <p className="text-sm text-gray-500">{user.email || 'email@example.com'}</p>
+          </div>
+        </div>
+
+        {/* Info Grid */}
+        <div className="flex justify-between mb-12">
+          {/* Bill To */}
+          <div className="w-5/12">
+            <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Bill To</h3>
+            <p className="text-lg font-bold text-gray-900">{contact.name || "Valued Client"}</p>
+            {contact.company && <p className="text-gray-700">{contact.company}</p>}
+            <p className="text-gray-600 text-sm mt-1">{contact.email}</p>
+          </div>
+
+          {/* Details */}
+          <div className="w-5/12">
+            <h3 className="text-xs font-bold text-gray-500 uppercase mb-3">Details</h3>
+            <div className="flex justify-between py-1 border-b border-gray-100">
+              <span className="text-sm text-gray-600">Date Issued:</span>
+              <span className="text-sm font-medium">{invoiceDate}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-gray-100">
+              <span className="text-sm text-gray-600">Due Date:</span>
+              <span className="text-sm font-medium">{dueDateString}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Line Items Table */}
-        <View style={styles.table}>
-          {/* Table Header */}
-          <View style={styles.tableHeader}>
-            <Text style={{ ...styles.colDesc, fontWeight: 'bold', color: '#6B7280' }}>DESCRIPTION</Text>
-            <Text style={{ ...styles.colQty, fontWeight: 'bold', color: '#6B7280' }}>QTY</Text>
-            <Text style={{ ...styles.colPrice, fontWeight: 'bold', color: '#6B7280' }}>PRICE</Text>
-            <Text style={{ ...styles.colTotal, fontWeight: 'bold', color: '#6B7280' }}>TOTAL</Text>
-          </View>
+        <div className="mb-8">
+          <div className="flex bg-gray-50 rounded-t border-b border-gray-200 py-2 px-4">
+            <div className="w-1/2 text-xs font-bold text-gray-500 uppercase">Description</div>
+            <div className="w-1/6 text-xs font-bold text-gray-500 uppercase text-center">Qty</div>
+            <div className="w-1/6 text-xs font-bold text-gray-500 uppercase text-right">Price</div>
+            <div className="w-1/6 text-xs font-bold text-gray-500 uppercase text-right">Total</div>
+          </div>
 
-          {/* Table Rows */}
-          {items.map((item: any, index: number) => (
-            <View key={index} style={styles.tableRow} wrap={false}>
-              <View style={styles.colDesc}>
-                {/* PRIMARY FIX: Displaying both Name AND Description */}
-                <Text style={{ fontWeight: 'bold', marginBottom: 2 }}>{item.name}</Text>
-                {item.description ? (
-                  <Text style={{ color: '#6B7280', fontSize: 9, fontStyle: 'italic' }}>
+          {items.map((item: any, i: number) => (
+            <div key={i} className="flex border-b border-gray-100 py-4 px-4 items-start">
+              <div className="w-1/2 pr-4">
+                <p className="text-sm font-bold text-gray-900">{item.name}</p>
+                {item.description && (
+                  <p className="text-sm text-gray-500 mt-1 italic whitespace-pre-wrap">
                     {item.description}
-                  </Text>
-                ) : null}
-              </View>
-              <Text style={styles.colQty}>{item.quantity}</Text>
-              <Text style={styles.colPrice}>{formatCurrency(item.price)}</Text>
-              <Text style={styles.colTotal}>{formatCurrency(item.price * item.quantity)}</Text>
-            </View>
+                  </p>
+                )}
+              </div>
+              <div className="w-1/6 text-sm text-gray-700 text-center pt-1">
+                {item.quantity}
+              </div>
+              <div className="w-1/6 text-sm text-gray-700 text-right pt-1">
+                ${Number(item.price).toLocaleString()}
+              </div>
+              <div className="w-1/6 text-sm font-medium text-gray-900 text-right pt-1">
+                ${(Number(item.price) * Number(item.quantity)).toLocaleString()}
+              </div>
+            </div>
           ))}
-        </View>
+        </div>
 
-        {/* Totals */}
-        <View style={styles.totalSection}>
-          <View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Subtotal</Text>
-              <Text style={{ fontSize: 10 }}>{formatCurrency(deal.amount)}</Text>
-            </View>
-            <View style={{ ...styles.totalRow, borderBottomWidth: 0, marginTop: 4 }}>
-              <Text style={{ ...styles.totalLabel, fontSize: 12 }}>Total Due</Text>
-              <Text style={styles.totalValue}>{formatCurrency(deal.amount)}</Text>
-            </View>
-          </View>
-        </View>
+        {/* Totals Section */}
+        <div className="flex justify-end">
+          <div className="w-1/2 lg:w-5/12">
+            <div className="flex justify-between py-2">
+              <span className="text-sm font-medium text-gray-600">Subtotal</span>
+              <span className="text-sm font-medium text-gray-900">${deal.amount?.toLocaleString() || '0'}</span>
+            </div>
+            <div className="flex justify-between py-3 border-t border-gray-200 mt-2">
+              <span className="text-base font-bold text-gray-900">Total Due</span>
+              <span className="text-xl font-bold text-blue-600">${deal.amount?.toLocaleString() || '0'}</span>
+            </div>
+          </div>
+        </div>
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text>Thank you for your business.</Text>
-          <Text style={{ marginTop: 4 }}>Generated by Pulse</Text>
-        </View>
+        <div className="mt-auto pt-8 border-t border-gray-100 text-center">
+          <p className="text-xs text-gray-400">Thank you for your business.</p>
+          <p className="text-xs text-gray-400 mt-1">Generated by Pulse</p>
+        </div>
 
-      </Page>
-    </Document>
+      </div>
+    </>
   );
-};
-
-export default InvoicePDF;
+}

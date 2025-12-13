@@ -34,6 +34,7 @@ import DealInvoices from "./DealInvoices"; // Import the Invoice List
 interface DashboardProps {
   deal: any;
   initialTab?: string;
+  user?: any;
 }
 
 interface RoadmapStage {
@@ -45,8 +46,7 @@ interface RoadmapStage {
 const generateId = () => {
   return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 };
-
-export default function DealDashboard({ deal: initialDeal, initialTab }: DashboardProps) {
+export default function DealDashboard({ deal: initialDeal, initialTab, user }: DashboardProps) {
   const [deal, setDeal] = useState(initialDeal);
   const router = useRouter();
   
@@ -391,12 +391,12 @@ export default function DealDashboard({ deal: initialDeal, initialTab }: Dashboa
              <DealFinances dealId={deal.id} dealAmount={deal.amount} expenses={deal.expenses || []} />
           </div>
         )}
-
         {activeTab === 'invoices' && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-200">
-             <DealInvoices deal={deal} />
+             <DealInvoices deal={deal} user={user} />
           </div>
         )}
+
 
         {activeTab === 'notes' && (
           <div className="min-h-[500px] animate-in fade-in zoom-in duration-200">
