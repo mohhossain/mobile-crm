@@ -99,8 +99,9 @@ async function getFinanceData(userId: string, period: Period, dateStr?: string) 
   const netProfit = totalRevenue - totalExpenses;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  const prevRevenue = prevDeals._sum?.amount || 0;
-  const prevExp = prevExpenses._sum?.amount || 0;
+  // FIX: Cast _sum to any to prevent "Property 'amount' does not exist on type '{}'" error during build
+  const prevRevenue = (prevDeals._sum as any)?.amount || 0;
+  const prevExp = (prevExpenses._sum as any)?.amount || 0;
   
   // Calculate % change
   const calcTrend = (curr: number, prev: number) => {
