@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
-  ArrowsUpDownIcon,
   CalendarIcon,
-  UserIcon
+  ChevronUpIcon,
+  ChevronDownIcon,
+  BarsArrowDownIcon
 } from "@heroicons/react/24/outline";
 
 interface Deal {
@@ -18,15 +19,36 @@ interface Deal {
   contacts: { id: string; name: string; imageUrl?: string }[];
 }
 
-export default function DealsList({ deals }: { deals: Deal[] }) {
+interface DealsListProps {
+  deals: Deal[];
+  currentSort: string;
+  currentDir: string;
+}
+
+export default function DealsList({ deals, currentSort, currentDir }: DealsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const currentSort = searchParams.get('sort') || 'date';
 
-  const handleSort = (sort: string) => {
+  const handleSort = (sortKey: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('sort', sort);
+    
+    // Toggle direction if clicking the same header
+    if (currentSort === sortKey) {
+      params.set('dir', currentDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Default to ascending
+      params.set('sort', sortKey);
+      params.set('dir', 'asc');
+    }
+    
     router.push(`/deals?${params.toString()}`);
+  };
+
+  const getSortIcon = (columnKey: string) => {
+    if (currentSort !== columnKey) return <BarsArrowDownIcon className="w-3 h-3 opacity-0 group-hover:opacity-30 transition-opacity" />;
+    return currentDir === 'asc' 
+      ? <ChevronUpIcon className="w-3 h-3 text-primary" />
+      : <ChevronDownIcon className="w-3 h-3 text-primary" />;
   };
 
   const getStatusBadge = (status: string) => {
@@ -43,10 +65,34 @@ export default function DealsList({ deals }: { deals: Deal[] }) {
     <div className="bg-base-100 border border-base-200 rounded-xl overflow-hidden shadow-sm">
       {/* Table Header (Desktop) */}
       <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-base-200 bg-base-200/30 text-xs font-bold uppercase tracking-wider text-base-content/50">
-        <div className="col-span-5 pl-2 cursor-pointer hover:text-base-content" onClick={() => handleSort('name')}>Deal Name</div>
-        <div className="col-span-2 cursor-pointer hover:text-base-content" onClick={() => handleSort('amount')}>Value</div>
-        <div className="col-span-2">Stage</div>
-        <div className="col-span-3 text-right pr-2 cursor-pointer hover:text-base-content" onClick={() => handleSort('date')}>Target Close</div>
+        
+        <div 
+          className="col-span-5 pl-2 cursor-pointer hover:text-base-content flex items-center gap-1 group select-none" 
+          onClick={() => handleSort('title')}
+        >
+          Deal Name {getSortIcon('title')}
+        </div>
+
+        <div 
+          className="col-span-2 cursor-pointer hover:text-base-content flex items-center gap-1 group select-none" 
+          onClick={() => handleSort('amount')}
+        >
+          Value {getSortIcon('amount')}
+        </div>
+
+        <div 
+          className="col-span-2 cursor-pointer hover:text-base-content flex items-center gap-1 group select-none"
+          onClick={() => handleSort('status')}
+        >
+          Stage {getSortIcon('status')}
+        </div>
+
+        <div 
+          className="col-span-3 text-right pr-2 cursor-pointer hover:text-base-content flex items-center justify-end gap-1 group select-none" 
+          onClick={() => handleSort('closeDate')}
+        >
+          Target Close {getSortIcon('closeDate')}
+        </div>
       </div>
 
       {/* Rows */}

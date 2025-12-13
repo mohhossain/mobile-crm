@@ -1,46 +1,87 @@
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/currentUser';
 import AddDeals from '../components/AddDeals';
-import DealsSearch from '../components/DealsSearch';
+import DealsFilterBar from '../components/DealsFilterBar';
 import DealsKanban from '../components/DealsKanban';
 import DealsList from '../components/DealsList';
 import Link from 'next/link';
 import { 
   PlusIcon, 
   Squares2X2Icon, 
-  ListBulletIcon,
+  ListBulletIcon, 
   ArchiveBoxIcon,
   ChartBarIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
 
-export default async function DealsPage({ searchParams }: { searchParams: Promise<{ q?: string, view?: string, status?: string, sort?: string }> }) {
+// Define expected Search Params
+interface SearchParamsProps {
+  q?: string;
+  view?: string;
+  status?: string;
+  sort?: string;
+  dir?: string;
+  minAmount?: string;
+  maxAmount?: string;
+  closingWithin?: string;
+}
+
+export default async function DealsPage({ searchParams }: { searchParams: Promise<SearchParamsProps> }) {
   const user = await getCurrentUser();
   if (!user) return <div className="p-10 text-center">Please sign in.</div>;
 
-  const { q, view = 'board', status = 'ALL', sort = 'date' } = await searchParams;
+  const { 
+    q, 
+    view = 'board', 
+    status = 'ALL', 
+    sort = 'updatedAt', 
+    dir = 'desc',
+    minAmount,
+    maxAmount,
+    closingWithin
+  } = await searchParams;
   
-  // 1. Fetch Deals
+  // --- BUILD FILTERS ---
   const where: any = { userId: user.id };
   
-  // Search Filter
+  // 1. Text Search
   if (q) {
     where.title = { contains: q, mode: 'insensitive' };
   }
 
-  // Status Filter
-  // We accept the new statuses. 'ALL' returns everything (except maybe archived in future).
+  // 2. Status Filter
   const VALID_STATUSES = ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
-  
-  if (status !== 'ALL' && VALID_STATUSES.includes(status)) {
+  if (view !== 'board' && status !== 'ALL' && VALID_STATUSES.includes(status)) {
     where.status = status;
   }
 
-  // Sorting Logic (Primarily for List View, but affects fetch order)
-  let orderBy: any = { updatedAt: 'desc' };
-  if (sort === 'amount') orderBy = { amount: 'desc' };
-  if (sort === 'name') orderBy = { title: 'asc' };
-  if (sort === 'date') orderBy = { closeDate: 'asc' };
+  // 3. Amount Filters (> or <)
+  if (minAmount || maxAmount) {
+    where.amount = {};
+    if (minAmount) where.amount.gte = parseFloat(minAmount);
+    if (maxAmount) where.amount.lte = parseFloat(maxAmount);
+  }
+
+  // 4. Closing Date Filter (Closing within X days)
+  if (closingWithin) {
+    const days = parseInt(closingWithin);
+    const today = new Date();
+    const targetDate = new Date();
+    targetDate.setDate(today.getDate() + days);
+
+    where.closeDate = {
+      gte: today,      // Must be in the future
+      lte: targetDate  // Less than Target Date
+    };
+  }
+
+  // --- BUILD SORT ---
+  const orderBy: any = {};
+  if (sort === 'amount' || sort === 'closeDate' || sort === 'title' || sort === 'updatedAt' || sort === 'status') {
+    orderBy[sort] = dir;
+  } else {
+    orderBy.updatedAt = 'desc'; // Fallback
+  }
 
   const dealsRaw = await prisma.deal.findMany({
     where,
@@ -51,7 +92,6 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     },
   });
 
-  // Transform deals to convert null to undefined for imageUrl
   const deals = dealsRaw.map(deal => ({
     ...deal,
     contacts: deal.contacts.map(contact => ({
@@ -60,21 +100,15 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     }))
   }));
 
-  // 2. Calculate Stats (Contextual to ALL deals for the user, regardless of current filter)
+  // Stats Calculation (Contextual to ALL deals to keep totals visible regardless of filter)
   const allDeals = await prisma.deal.findMany({
     where: { userId: user.id },
-    select: { amount: true, status: true, probability: true }
+    select: { amount: true, status: true }
   });
 
   const totalPipeline = allDeals.reduce((sum, d) => d.status !== 'LOST' ? sum + d.amount : sum, 0);
-  const weightedPipeline = allDeals.reduce((sum, d) => {
-     if (d.status === 'LOST') return sum;
-     const prob = d.probability ?? (d.status === 'WON' ? 100 : 50);
-     return sum + (d.amount * (prob / 100));
-  }, 0);
   const wonCount = allDeals.filter(d => d.status === 'WON').length;
 
-  // 3. Helper for Tab Styles
   const getTabClass = (tabStatus: string) => {
     const isActive = status === tabStatus;
     return `tab whitespace-nowrap flex-shrink-0 px-6 h-10 transition-all duration-200 ${
@@ -113,10 +147,10 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
 
              {/* View Toggle */}
              <div className="join bg-base-200 p-1 rounded-lg ml-auto md:ml-0">
-                <Link href={`/deals?view=board&q=${q || ''}&status=${status}`} className={`btn btn-xs join-item ${view === 'board' ? 'btn-active bg-base-100 shadow-sm' : 'btn-ghost'}`}>
+                <Link href={`/deals?view=board`} className={`btn btn-xs join-item ${view === 'board' ? 'btn-active bg-base-100 shadow-sm' : 'btn-ghost'}`}>
                   <Squares2X2Icon className="w-4 h-4" />
                 </Link>
-                <Link href={`/deals?view=list&q=${q || ''}&status=${status}`} className={`btn btn-xs join-item ${view === 'list' ? 'btn-active bg-base-100 shadow-sm' : 'btn-ghost'}`}>
+                <Link href={`/deals?view=list`} className={`btn btn-xs join-item ${view === 'list' ? 'btn-active bg-base-100 shadow-sm' : 'btn-ghost'}`}>
                   <ListBulletIcon className="w-4 h-4" />
                 </Link>
              </div>
@@ -127,20 +161,24 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
            </div>
         </div>
 
-        {/* SEARCH & FILTERS (Sticky) */}
+        {/* SEARCH & FILTER BAR */}
         <div className="sticky top-0 z-20 space-y-4">
-           <DealsSearch />
            
-           {/* Status Tabs - Scrollable */}
-           <div className="tabs tabs-bordered w-full overflow-x-auto flex-nowrap no-scrollbar border-b border-base-content/5">
-             <Link href={`/deals?view=${view}&status=ALL`} className={getTabClass('ALL')}>All</Link>
-             <Link href={`/deals?view=${view}&status=NEW`} className={getTabClass('NEW')}>New</Link>
-             <Link href={`/deals?view=${view}&status=QUALIFIED`} className={getTabClass('QUALIFIED')}>Qualified</Link>
-             <Link href={`/deals?view=${view}&status=PROPOSAL`} className={getTabClass('PROPOSAL')}>Proposal</Link>
-             <Link href={`/deals?view=${view}&status=NEGOTIATION`} className={getTabClass('NEGOTIATION')}>Negotiation</Link>
-             <Link href={`/deals?view=${view}&status=WON`} className={getTabClass('WON')}>Won</Link>
-             <Link href={`/deals?view=${view}&status=LOST`} className={getTabClass('LOST')}>Lost</Link>
-           </div>
+           {/* New Filter Bar Component - Manages its own visibility based on 'view' param */}
+           <DealsFilterBar />
+
+           {/* Status Tabs (Hidden in Board View) */}
+           {view === 'list' && (
+             <div className="tabs tabs-bordered w-full overflow-x-auto flex-nowrap no-scrollbar border-b border-base-content/5">
+               <Link href={`/deals?view=list&status=ALL`} className={getTabClass('ALL')}>All</Link>
+               <Link href={`/deals?view=list&status=NEW`} className={getTabClass('NEW')}>New</Link>
+               <Link href={`/deals?view=list&status=QUALIFIED`} className={getTabClass('QUALIFIED')}>Qualified</Link>
+               <Link href={`/deals?view=list&status=PROPOSAL`} className={getTabClass('PROPOSAL')}>Proposal</Link>
+               <Link href={`/deals?view=list&status=NEGOTIATION`} className={getTabClass('NEGOTIATION')}>Negotiation</Link>
+               <Link href={`/deals?view=list&status=WON`} className={getTabClass('WON')}>Won</Link>
+               <Link href={`/deals?view=list&status=LOST`} className={getTabClass('LOST')}>Lost</Link>
+             </div>
+           )}
         </div>
       </div>
 
@@ -151,14 +189,14 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
               <div className="p-4 bg-base-200 rounded-full">
                 <ArchiveBoxIcon className="w-8 h-8" />
               </div>
-              <p>No deals found in this view.</p>
+              <p>No deals found matching filters.</p>
               <label htmlFor="add-deal-modal" className="btn btn-sm btn-outline">Create Deal</label>
             </div>
          ) : view === 'board' ? (
            <DealsKanban deals={deals} />
          ) : (
            <div className="h-full overflow-y-auto pb-20 pr-2 custom-scrollbar">
-             <DealsList deals={deals} />
+             <DealsList deals={deals} currentSort={sort} currentDir={dir} />
            </div>
          )}
       </div>
