@@ -106,7 +106,8 @@ async function getFinanceData(userId: string, period: Period, dateStr?: string) 
   // Calculate % change
   const calcTrend = (curr: number, prev: number) => {
     if (prev === 0) return curr > 0 ? 100 : 0;
-    return ((curr - prev) / prev) * 100;
+    // FIX: Use absolute value of previous period to correctly handle sign flips (Negative -> Positive)
+    return ((curr - prev) / Math.abs(prev)) * 100;
   };
 
   const trends = {

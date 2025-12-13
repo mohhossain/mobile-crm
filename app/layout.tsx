@@ -58,7 +58,7 @@ export default async function RootLayout({
                 <div className="flex-1 flex flex-col h-full min-w-0 relative">
                   
                   {/* Header: Fixed at top of content column */}
-                  <header className="flex-none h-16 pt-safe flex justify-between items-center px-6 gap-4 bg-base-100/50 backdrop-blur-md z-40 border-b border-base-200 lg:bg-transparent lg:border-none">
+                  <header className="flex-none h-16 flex justify-between items-center px-6 gap-4 bg-base-100/50 backdrop-blur-md border-b border-base-200 lg:bg-transparent lg:border-none">
                     
                     <div></div>
                     

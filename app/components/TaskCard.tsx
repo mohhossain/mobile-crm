@@ -9,7 +9,9 @@ import {
   PencilSquareIcon, 
   XMarkIcon,
   CheckIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as SolidCheck } from "@heroicons/react/24/solid";
 
@@ -29,6 +31,10 @@ export default function TaskCard({ task }: TaskProps) {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  
+  // Notification State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || "");
@@ -44,40 +50,94 @@ export default function TaskCard({ task }: TaskProps) {
 
   const router = useRouter();
 
-  // --- 1. Calendar Export Utility ---
-  const handleAddToCalendar = () => {
-    if (!task.dueDate) return alert("This task has no due date.");
+  // --- Helper: Show Toast ---
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
-    // Format for ICS (YYYYMMDDTHHMMSSZ)
-    const formatDate = (date: Date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
-    
+  // --- Calendar Utilities ---
+
+  const getEventDates = () => {
+    if (!task.dueDate) return null;
     const start = new Date(task.dueDate);
-    const end = new Date(start.getTime() + 60 * 60 * 1000); // Default 1 hour duration
+    const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 Hour
+    
+    const format = (d: Date) => d.toISOString().replace(/-|:|\.\d\d\d/g, "");
+    return { start: format(start), end: format(end) };
+  };
 
-    const icsContent = `
-BEGIN:VCALENDAR
+  const handleGoogleCalendar = () => {
+    const dates = getEventDates();
+    if (!dates) return;
+    
+    const url = new URL("https://calendar.google.com/calendar/render");
+    url.searchParams.append("action", "TEMPLATE");
+    url.searchParams.append("text", task.title);
+    url.searchParams.append("details", task.description || "");
+    url.searchParams.append("dates", `${dates.start}/${dates.end}`);
+    
+    // Open in new tab (Capacitor handles this by opening system browser/app)
+    window.open(url.toString(), "_blank");
+    setShowCalendarModal(false);
+  };
+
+  const handleDownloadICS = async () => {
+    if (!task.dueDate) return;
+    const dates = getEventDates();
+    if (!dates) return;
+
+    const icsContent = `BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//Pulse//Task Manager//EN
 BEGIN:VEVENT
 UID:${task.id}@pulse.app
-DTSTAMP:${formatDate(new Date())}
-DTSTART:${formatDate(start)}
-DTEND:${formatDate(end)}
+DTSTAMP:${dates.start}
+DTSTART:${dates.start}
+DTEND:${dates.end}
 SUMMARY:${task.title}
 DESCRIPTION:${task.description || ""}
 END:VEVENT
-END:VCALENDAR`.trim();
+END:VCALENDAR`;
 
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+    const fileName = `${task.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ics`;
+    const file = new File([icsContent], fileName, { type: 'text/calendar' });
+
+    // Try Native Share first (Works best on Mobile)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: task.title,
+          text: 'Add to your calendar'
+        });
+        setShowCalendarModal(false);
+        return;
+      } catch (e) {
+        console.log("Share skipped", e);
+      }
+    }
+
+    // Fallback: Direct Download (Works on Desktop)
+    const uri = "data:text/calendar;charset=utf-8," + encodeURIComponent(icsContent);
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `${task.title.replace(/\s+/g, "_")}.ics`);
+    link.href = uri;
+    link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setShowCalendarModal(false);
   };
 
   // --- Handlers ---
+  const handleAddToCalendar = () => {
+    if (!task.dueDate) {
+      showToast("This task has no due date set.", "error");
+      return;
+    }
+    setShowCalendarModal(true);
+  };
+
   const toggleStatus = async () => {
     setLoading(true);
     const newStatus = task.status === 'DONE' ? 'TO_DO' : 'DONE';
@@ -87,9 +147,13 @@ END:VCALENDAR`.trim();
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+        showToast(`Task marked as ${newStatus === 'DONE' ? 'Done' : 'To Do'}`, "success");
+      }
     } catch (e) {
       console.error(e);
+      showToast("Failed to update status", "error");
     } finally {
       setLoading(false);
     }
@@ -116,11 +180,13 @@ END:VCALENDAR`.trim();
       });
 
       if (!res.ok) throw new Error("Failed to update");
+      
       setIsEditing(false);
+      showToast("Task updated successfully", "success");
       router.refresh();
     } catch (e) {
       console.error(e);
-      alert("Failed to save changes.");
+      showToast("Failed to save changes", "error");
     } finally {
       setLoading(false);
     }
@@ -130,9 +196,13 @@ END:VCALENDAR`.trim();
     setLoading(true);
     try {
       const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
-      if (res.ok) router.refresh();
+      if (res.ok) {
+        router.refresh();
+        showToast("Task deleted", "success");
+      }
     } catch (e) {
       console.error(e);
+      showToast("Failed to delete task", "error");
     } finally {
       setLoading(false);
       setShowDeleteModal(false);
@@ -205,8 +275,18 @@ END:VCALENDAR`.trim();
         </div>
       </div>
 
+      {/* TOAST NOTIFICATION */}
+      {toast && (
+        <div className="toast toast-bottom toast-center z-[100]">
+          <div className={`alert ${toast.type === 'error' ? 'alert-error' : toast.type === 'success' ? 'alert-success' : 'alert-info'} shadow-lg text-white text-sm py-2 min-h-0`}>
+            <span>{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION */}
       {showDeleteModal && (
-        <dialog open className="modal modal-bottom sm:modal-middle bg-black/50">
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/50 backdrop-blur-sm z-50">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Delete Task?</h3>
             <p className="py-4">Are you sure you want to delete <strong>{task.title}</strong>?</p>
@@ -215,6 +295,46 @@ END:VCALENDAR`.trim();
               <button className="btn btn-error" onClick={handleDelete}>Delete</button>
             </div>
           </div>
+          <div className="modal-backdrop" onClick={() => setShowDeleteModal(false)}></div>
+        </dialog>
+      )}
+
+      {/* CALENDAR OPTIONS */}
+      {showCalendarModal && (
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/50 backdrop-blur-sm z-50">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <CalendarDaysIcon className="w-6 h-6 text-primary" />
+              Add to Calendar
+            </h3>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={handleGoogleCalendar}
+                className="btn btn-outline justify-start gap-3 h-auto py-3"
+              >
+                <ArrowTopRightOnSquareIcon className="w-5 h-5 text-blue-500" />
+                <div className="text-left">
+                  <div className="font-bold">Google Calendar</div>
+                  <div className="text-[10px] opacity-60">Opens browser (Best for Android)</div>
+                </div>
+              </button>
+
+              <button 
+                onClick={handleDownloadICS}
+                className="btn btn-outline justify-start gap-3 h-auto py-3"
+              >
+                <ArrowDownTrayIcon className="w-5 h-5 text-gray-500" />
+                <div className="text-left">
+                  <div className="font-bold">Device Calendar (.ics)</div>
+                  <div className="text-[10px] opacity-60">Save file (Apple / Outlook)</div>
+                </div>
+              </button>
+            </div>
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setShowCalendarModal(false)}>Close</button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowCalendarModal(false)}></div>
         </dialog>
       )}
     </>
