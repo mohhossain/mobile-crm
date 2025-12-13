@@ -1,203 +1,286 @@
-// ... imports (keep existing) ...
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
-import FinanceTool from "@/app/components/FinanceTool";
-import ExpenseList from "@/app/components/ExpenseList";
-import DownloadExpensesButton from "@/app/components/DownloadExpensesButton";
-import Link from "next/link";
+import FinanceControls from "@/app/components/FinanceControls";
+import FinanceBarChart from "@/app/components/FinanceBarChart";
+import FinanceCategoryDonut from "@/app/components/FinanceCategoryDonut";
+import GeneralLedger, { LedgerItem } from "@/app/components/GeneralLedger";
 import { 
   BanknotesIcon, 
   ArrowTrendingUpIcon, 
   ArrowTrendingDownIcon,
-  CreditCardIcon
+  InformationCircleIcon,
+  ChartPieIcon
 } from "@heroicons/react/24/solid";
+import { 
+  startOfWeek, endOfWeek, 
+  startOfMonth, endOfMonth, 
+  startOfYear, endOfYear, 
+  eachDayOfInterval, eachMonthOfInterval, eachYearOfInterval,
+  format, parseISO, isSameDay, isSameMonth, isSameYear, isValid,
+  sub
+} from "date-fns";
 
-async function getFinanceData(userId: string, range: string = '6m') {
-  // FIX: Added 'probability' to the select to prevent crashes in components using this data
-  const deals = await prisma.deal.findMany({
-    where: { userId },
-    select: { 
-      id: true, 
-      amount: true, 
-      status: true, 
-      updatedAt: true, 
-      closeDate: true, 
-      title: true,
-      probability: true // Added this field
-    }
-  });
+// --- TYPES ---
+type Period = 'week' | 'month' | 'year' | 'all';
 
-  // ... expenses query ...
-  const expenses = await prisma.expense.findMany({
-    where: { userId },
-    orderBy: { date: 'desc' },
-    include: { deal: { select: { title: true } } }
-  });
+// --- DATA FETCHING & PROCESSING ---
+async function getFinanceData(userId: string, period: Period, dateStr?: string) {
+  
+  // 1. Determine Date Range (Current & Previous for comparison)
+  const referenceDate = dateStr && isValid(parseISO(dateStr)) ? parseISO(dateStr) : new Date();
+  
+  let startDate = new Date();
+  let endDate = new Date();
+  let prevStartDate = new Date();
+  let prevEndDate = new Date();
 
-  // ... totals calculation (keep existing) ...
-  const totalRevenue = deals
-    .filter(d => d.status === 'WON')
-    .reduce((sum, d) => sum + d.amount, 0);
-    
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  switch (period) {
+    case 'week':
+      startDate = startOfWeek(referenceDate, { weekStartsOn: 1 }); 
+      endDate = endOfWeek(referenceDate, { weekStartsOn: 1 });
+      prevStartDate = sub(startDate, { weeks: 1 });
+      prevEndDate = sub(endDate, { weeks: 1 });
+      break;
+    case 'month':
+      startDate = startOfMonth(referenceDate);
+      endDate = endOfMonth(referenceDate);
+      prevStartDate = sub(startDate, { months: 1 });
+      prevEndDate = sub(endDate, { months: 1 });
+      break;
+    case 'year':
+      startDate = startOfYear(referenceDate);
+      endDate = endOfYear(referenceDate);
+      prevStartDate = sub(startDate, { years: 1 });
+      prevEndDate = sub(endDate, { years: 1 });
+      break;
+    case 'all':
+      startDate = new Date('2020-01-01'); 
+      endDate = new Date(); 
+      prevStartDate = new Date('1970-01-01'); // N/A
+      prevEndDate = new Date('1970-01-01');
+      break;
+  }
+
+  // 2. Fetch Data (Filtered by Range)
+  // We separate fetches into two groups to ensure TypeScript correctly infers the aggregate types.
+  
+  // Group A: Current Period Lists
+  const [currDeals, currExpenses, currInvoices] = await Promise.all([
+    prisma.deal.findMany({
+      where: { userId, status: 'WON', OR: [{ closeDate: { gte: startDate, lte: endDate } }, { closeDate: null, updatedAt: { gte: startDate, lte: endDate } }] },
+      select: { id: true, amount: true, closeDate: true, updatedAt: true, title: true }
+    }),
+    prisma.expense.findMany({
+      where: { userId, date: { gte: startDate, lte: endDate } },
+      orderBy: { date: 'desc' },
+      include: { deal: { select: { title: true } } }
+    }),
+    prisma.invoice.findMany({
+      where: { userId, issueDate: { gte: startDate, lte: endDate } },
+      include: { deal: { select: { title: true, contacts: true } } }
+    })
+  ]);
+
+  // Group B: Previous Period Aggregates (Strict Type Inference)
+  const [prevDeals, prevExpenses] = await Promise.all([
+    prisma.deal.aggregate({
+      where: { userId, status: 'WON', OR: [{ closeDate: { gte: prevStartDate, lte: prevEndDate } }, { closeDate: null, updatedAt: { gte: prevStartDate, lte: prevEndDate } }] },
+      _sum: { amount: true }
+    }),
+    prisma.expense.aggregate({
+      where: { userId, date: { gte: prevStartDate, lte: prevEndDate } },
+      _sum: { amount: true }
+    })
+  ]);
+
+  // 3. Aggregate Totals & Trends
+  const totalRevenue = currDeals.reduce((sum, d) => sum + d.amount, 0);
+  const totalExpenses = currExpenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  // ... month buckets generation (keep existing) ...
-  // Generate Monthly Buckets
-  let monthCount = 6;
-  if (range === '1y') monthCount = 12;
-  // ... existing logic for 'all' range ...
-  if (range === 'all') {
-    // Find the earliest date in data to determine range
-    let minDate = new Date();
-    
-    deals.forEach(d => {
-      const dDate = new Date(d.updatedAt);
-      if (dDate < minDate) minDate = dDate;
-    });
-    
-    expenses.forEach(e => {
-      const eDate = new Date(e.date);
-      if (eDate < minDate) minDate = eDate;
-    });
+  const prevRevenue = prevDeals._sum?.amount || 0;
+  const prevExp = prevExpenses._sum?.amount || 0;
+  
+  // Calculate % change
+  const calcTrend = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0;
+    return ((curr - prev) / prev) * 100;
+  };
 
-    const today = new Date();
-    // Calculate difference in months
-    monthCount = (today.getFullYear() - minDate.getFullYear()) * 12 + (today.getMonth() - minDate.getMonth()) + 1;
-    // Ensure at least 6 months show for aesthetics
-    if (monthCount < 6) monthCount = 6;
+  const trends = {
+    revenue: calcTrend(totalRevenue, prevRevenue),
+    expenses: calcTrend(totalExpenses, prevExp),
+    profit: calcTrend(netProfit, prevRevenue - prevExp)
+  };
+
+  // 4. Generate Chart Buckets
+  let buckets: Date[] = [];
+  let formatLabel = (d: Date) => "";
+  let isSame = (d1: Date, d2: Date) => false;
+
+  if (period === 'week' || period === 'month') {
+    buckets = eachDayOfInterval({ start: startDate, end: endDate });
+    formatLabel = (d) => format(d, "d"); 
+    isSame = isSameDay;
+  } else if (period === 'year') {
+    buckets = eachMonthOfInterval({ start: startDate, end: endDate });
+    formatLabel = (d) => format(d, "MMM");
+    isSame = isSameMonth;
+  } else {
+    buckets = eachYearOfInterval({ start: startDate, end: endDate });
+    formatLabel = (d) => format(d, "yyyy");
+    isSame = isSameYear;
   }
 
-  const today = new Date();
-  const months = Array.from({ length: monthCount }, (_, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    return {
-      label: d.toLocaleString('default', { month: 'short', year: range !== '6m' ? '2-digit' : undefined }),
-      monthIdx: d.getMonth(),
-      year: d.getFullYear()
-    };
-  }).reverse();
-
-  const chartData = months.map(({ label, monthIdx, year }) => {
-    const monthRevenue = deals
-      .filter(d => {
-        // FIX: Use closeDate for WON deals if available, otherwise fallback to updatedAt
-        const targetDate = d.status === 'WON' && d.closeDate ? new Date(d.closeDate) : new Date(d.updatedAt);
-        return d.status === 'WON' && targetDate.getMonth() === monthIdx && targetDate.getFullYear() === year;
-      })
+  const chartData = buckets.map(bucketDate => {
+    const revenue = currDeals
+      .filter(d => isSame(d.closeDate || d.updatedAt, bucketDate))
       .reduce((sum, d) => sum + d.amount, 0);
-      
-    // ... existing expense filter ...
-    const monthExpenses = expenses
-      .filter(e => {
-        const date = new Date(e.date);
-        return date.getMonth() === monthIdx && date.getFullYear() === year;
-      })
+    const expense = currExpenses
+      .filter(e => isSame(e.date, bucketDate))
       .reduce((sum, e) => sum + e.amount, 0);
-
-    return { month: label, revenue: monthRevenue, expense: monthExpenses };
+    return { label: formatLabel(bucketDate), dateStr: bucketDate.toISOString(), revenue, expense };
   });
 
-  // ... return data ...
+  // 5. Build General Ledger (Unified List)
+  const ledger: LedgerItem[] = [
+    // Add Invoices (Income)
+    ...currInvoices.map(inv => ({
+      id: inv.id,
+      date: inv.issueDate,
+      type: 'INCOME' as const,
+      entity: inv.deal?.contacts?.[0]?.name || inv.deal?.title || "Unknown Client",
+      category: "Sales",
+      amount: inv.amount,
+      status: inv.status,
+      reference: inv.number
+    })),
+    // Add Expenses (Expense)
+    ...currExpenses.map(exp => ({
+      id: exp.id,
+      date: exp.date,
+      type: 'EXPENSE' as const,
+      entity: exp.description,
+      category: exp.category,
+      amount: exp.amount,
+      status: 'PAID', // Expenses logged are usually paid
+      reference: exp.deal?.title
+    }))
+  ];
+
   return {
     totals: { revenue: totalRevenue, expenses: totalExpenses, profit: netProfit, margin },
+    trends,
     chartData,
-    deals,
-    expenses
+    expenses: currExpenses,
+    ledger
   };
 }
 
-export default async function FinancePage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
-  // ... (keep existing render logic) ...
+// --- PAGE COMPONENT ---
+export default async function FinancePage({ searchParams }: { searchParams: Promise<{ period?: string, date?: string }> }) {
   const user = await getCurrentUser();
-  if (!user) return <div>Unauthorized</div>;
+  if (!user) return <div className="p-10 text-center">Please sign in.</div>;
 
-  const { range = '6m' } = await searchParams;
-  const data = await getFinanceData(user.id, range);
+  const { period = 'month', date } = await searchParams;
+  const safePeriod = (['week', 'month', 'year', 'all'].includes(period) ? period : 'month') as Period;
 
-  // Prepare SVG Path Data
-  const maxVal = Math.max(...data.chartData.map(d => Math.max(d.revenue, d.expense))) || 1000;
-  const getY = (val: number) => 98 - (val / maxVal) * 98;
-  const getX = (index: number) => (index / (Math.max(data.chartData.length - 1, 1))) * 100;
-  const revenuePoints = data.chartData.map((d, i) => `${getX(i)},${getY(d.revenue)}`).join(" ");
-  const expensePoints = data.chartData.map((d, i) => `${getX(i)},${getY(d.expense)}`).join(" ");
+  const data = await getFinanceData(user.id, safePeriod, date);
 
-  const getTabClass = (r: string) => `tab tab-xs ${range === r ? 'tab-active font-bold' : ''}`;
+  // Trend Badge Helper
+  const TrendBadge = ({ value }: { value: number }) => {
+    if (value === 0) return <span className="text-xs opacity-50">-</span>;
+    const isPositive = value > 0;
+    return (
+      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isPositive ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+        {isPositive ? '↑' : '↓'} {Math.abs(value).toFixed(0)}%
+      </span>
+    );
+  };
 
-  // ... return JSX (Identical to previous version, just ensure getFinanceData uses new logic) ...
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Financial Overview</h1>
-        <p className="text-gray-500">Track revenue, manage burn rate, and forecast profits.</p>
+    <div className="space-y-6 pb-32">
+      
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Financial Overview</h1>
+          <p className="text-base-content/60 text-sm">Analyze cash flow, profitability, and trends.</p>
+        </div>
+        <FinanceControls />
       </div>
-      {/* ... Top Cards ... */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-         {/* ... Cards ... */}
-         <div className="stats shadow bg-base-100 border border-base-200">
-            <div className="stat"><div className="stat-title">Total Revenue</div><div className="stat-value text-success">${data.totals.revenue.toLocaleString()}</div></div>
+
+      {/* 1. EDUCATED TILES (With Trends) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+         
+         <div className="stat bg-base-100 shadow-sm border border-base-200 rounded-2xl relative group">
+            <div className="tooltip tooltip-bottom absolute top-2 right-2 z-10" data-tip="Total revenue from Won Deals.">
+               <InformationCircleIcon className="w-4 h-4 text-base-content/20 hover:text-primary transition-colors cursor-help" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60 flex justify-between">
+              Revenue <TrendBadge value={data.trends.revenue} />
+            </div>
+            <div className="stat-value text-success text-2xl lg:text-3xl mt-1">${data.totals.revenue.toLocaleString()}</div>
          </div>
-         <div className="stats shadow bg-base-100 border border-base-200">
-            <div className="stat"><div className="stat-title">Total Expenses</div><div className="stat-value text-error">${data.totals.expenses.toLocaleString()}</div></div>
+
+         <div className="stat bg-base-100 shadow-sm border border-base-200 rounded-2xl relative group">
+            <div className="tooltip tooltip-bottom absolute top-2 right-2 z-10" data-tip="Total expenses logged.">
+               <InformationCircleIcon className="w-4 h-4 text-base-content/20 hover:text-primary transition-colors cursor-help" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60 flex justify-between">
+              Expenses <TrendBadge value={data.trends.expenses} />
+            </div>
+            <div className="stat-value text-error text-2xl lg:text-3xl mt-1">-${data.totals.expenses.toLocaleString()}</div>
          </div>
-         <div className="stats shadow bg-base-100 border border-base-200">
-            <div className="stat"><div className="stat-title">Net Profit</div><div className="stat-value text-primary">${data.totals.profit.toLocaleString()}</div></div>
+
+         <div className="stat bg-base-100 shadow-sm border border-base-200 rounded-2xl relative group">
+            <div className="tooltip tooltip-bottom absolute top-2 right-2 z-10" data-tip="Revenue - Expenses.">
+               <InformationCircleIcon className="w-4 h-4 text-base-content/20 hover:text-primary transition-colors cursor-help" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60 flex justify-between">
+              Net Profit <TrendBadge value={data.trends.profit} />
+            </div>
+            <div className={`stat-value text-2xl lg:text-3xl mt-1 ${data.totals.profit >= 0 ? 'text-base-content' : 'text-error'}`}>
+              ${data.totals.profit.toLocaleString()}
+            </div>
          </div>
-          <div className="stats shadow bg-base-100 border border-base-200">
-            <div className="stat"><div className="stat-title">Margin</div><div className="stat-value text-secondary">{data.totals.margin.toFixed(1)}%</div></div>
+
+         <div className="stat bg-base-100 shadow-sm border border-base-200 rounded-2xl relative group">
+            <div className="tooltip tooltip-bottom tooltip-left absolute top-2 right-2 z-10" data-tip="Profit Margin %">
+               <InformationCircleIcon className="w-4 h-4 text-base-content/20 hover:text-primary transition-colors cursor-help" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60">Margin</div>
+            <div className="stat-value text-secondary text-2xl lg:text-3xl mt-1">{data.totals.margin.toFixed(1)}%</div>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div className="card bg-base-100 shadow border border-base-200">
-            <div className="card-body">
-              <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-                <h2 className="card-title text-sm uppercase text-gray-500">Performance Trend</h2>
-                <div className="tabs tabs-boxed tabs-xs bg-base-200">
-                  <Link href="/finance?range=6m" className={getTabClass('6m')}>6 Months</Link>
-                  <Link href="/finance?range=1y" className={getTabClass('1y')}>1 Year</Link>
-                  <Link href="/finance?range=all" className={getTabClass('all')}>All Time</Link>
+      {/* 2. SPLIT VIEW: Chart & Breakdown */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        
+        {/* Main Chart (66%) */}
+        <div className="xl:col-span-2 card bg-base-100 shadow-sm border border-base-200">
+          <div className="card-body p-4 sm:p-6">
+             <div className="flex justify-between items-center mb-6">
+                <h2 className="card-title text-sm uppercase opacity-50">Cash Flow Timeline</h2>
+                <div className="flex items-center gap-4 text-xs font-bold">
+                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-success"></div> Revenue</div>
+                   <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-error"></div> Expense</div>
                 </div>
-              </div>
-              <div className="h-64 w-full relative">
-                <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                   {[0, 25, 50, 75, 100].map(y => <line key={y} x1="0" y1={y} x2="100" y2={y} stroke="currentColor" strokeOpacity="0.05" strokeWidth="0.5" vectorEffect="non-scaling-stroke" />)}
-                   <polyline fill="none" strokeWidth="3" points={revenuePoints} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" className="stroke-success drop-shadow-sm" />
-                   <polyline fill="none" strokeWidth="3" points={expensePoints} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="6 4" className="stroke-error drop-shadow-sm opacity-80" />
-                </svg>
-                 {/* Interaction Layer */}
-                <div className="absolute inset-0 flex justify-between items-end z-10">
-                  {data.chartData.map((item, i) => (
-                    <div key={i} className="relative flex-1 h-full group flex flex-col justify-end items-center cursor-crosshair hover:bg-base-content/5 transition-colors rounded-lg">
-                       <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-base-300 text-base-content text-xs p-2 rounded pointer-events-none transition-all shadow-xl border border-base-content/10 z-30 w-28 text-center">
-                         <div className="font-bold mb-1">{item.month}</div>
-                         <div className="text-success">Rev: ${item.revenue.toLocaleString()}</div>
-                         <div className="text-error">Exp: ${item.expense.toLocaleString()}</div>
-                       </div>
-                       <div className="absolute w-2 h-2 bg-success rounded-full shadow-sm opacity-0 group-hover:opacity-100 z-20" style={{ top: `${getY(item.revenue)}%`, marginTop: '-4px' }}></div>
-                       <div className="absolute w-2 h-2 bg-error rounded-full shadow-sm opacity-0 group-hover:opacity-100 z-20" style={{ top: `${getY(item.expense)}%`, marginTop: '-4px' }}></div>
-                       {(data.chartData.length <= 12 || i % Math.ceil(data.chartData.length / 6) === 0) && <div className="mb-2 text-[10px] font-bold text-base-content/40 group-hover:text-base-content/70 whitespace-nowrap">{item.month}</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          <ExpenseList initialExpenses={data.expenses} />
-        </div>
-        <div className="space-y-8">
-           <FinanceTool deals={data.deals} />
-           <div className="card bg-base-200 border border-base-300">
-             <div className="card-body">
-               <h3 className="font-bold">Tax Season?</h3>
-               <p className="text-sm text-gray-500">Export your expense report for your accountant.</p>
-               <DownloadExpensesButton expenses={data.expenses} />
              </div>
-           </div>
+             <FinanceBarChart data={data.chartData} />
+          </div>
+        </div>
+
+        {/* Breakdown Donut (33%) */}
+        <div className="xl:col-span-1">
+           <FinanceCategoryDonut expenses={data.expenses} />
         </div>
       </div>
+
+      {/* 3. GENERAL LEDGER */}
+      <GeneralLedger items={data.ledger} />
+
     </div>
   );
 }

@@ -34,7 +34,6 @@ export async function GET(
   return NextResponse.json(deal)
 }
 
-// FIX: Ensure PUT is exported to handle status changes
 export async function PUT(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
@@ -44,7 +43,7 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { title, amount, status, closeDate, contactIds, probability, roadmap } = body
+  const { title, amount, status, stage, closeDate, contactIds, probability, roadmap } = body
 
   try {
     const updatedDeal = await prisma.deal.update({
@@ -53,6 +52,7 @@ export async function PUT(
         ...(title && { title }),
         ...(amount !== undefined && { amount: parseFloat(amount) }),
         ...(status && { status }),
+        ...(stage && { stage }), // NEW: Update Visual Stage independently
         ...(probability !== undefined && { probability }),
         ...(closeDate !== undefined && { closeDate: toSafeDate(closeDate) }),
         ...(roadmap && { roadmap }),

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
-  EllipsisHorizontalIcon, 
-  CalendarIcon
+  CalendarIcon,
+  EllipsisHorizontalIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon
 } from "@heroicons/react/24/outline";
 
 interface Deal {
@@ -13,217 +16,293 @@ interface Deal {
   title: string;
   amount: number;
   status: string;
+  stage: string;
   updatedAt: Date | string;
   closeDate?: Date | string | null;
   probability?: number;
   contacts: { id: string; name: string; imageUrl?: string }[];
-  tags: { name: string }[];
 }
 
-// UPDATED STAGES
-const STAGES = ['NEW', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST'];
+const DEFAULT_STAGES = ['Lead', 'Meeting', 'Proposal', 'Negotiation'];
+const TERMINAL_STAGES = ['Won', 'Lost'];
 
-// Updated Colors
-const STATUS_COLORS: Record<string, string> = {
-  NEW: 'border-base-content/20 text-base-content',
-  QUALIFIED: 'border-primary text-primary',
-  PROPOSAL: 'border-secondary text-secondary',
-  NEGOTIATION: 'border-info text-info',
-  WON: 'border-success text-success',
-  LOST: 'border-error text-error'
-};
-
-const STATUS_BG: Record<string, string> = {
-  NEW: 'bg-base-content/5',
-  QUALIFIED: 'bg-primary/5',
-  PROPOSAL: 'bg-secondary/5',
-  NEGOTIATION: 'bg-info/5',
-  WON: 'bg-success/5',
-  LOST: 'bg-error/5'
+const STAGE_STYLES: Record<string, { border: string; bg: string; badge: string; text: string }> = {
+  'Lead': { border: 'border-base-content/20', bg: 'bg-base-200/50', badge: 'badge-ghost', text: 'text-base-content' },
+  'Meeting': { border: 'border-info', bg: 'bg-info/5', badge: 'badge-info', text: 'text-info' },
+  'Proposal': { border: 'border-secondary', bg: 'bg-secondary/5', badge: 'badge-secondary', text: 'text-secondary' },
+  'Negotiation': { border: 'border-warning', bg: 'bg-warning/5', badge: 'badge-warning', text: 'text-warning' },
+  'Won': { border: 'border-success', bg: 'bg-success/5', badge: 'badge-success', text: 'text-success' },
+  'Lost': { border: 'border-error', bg: 'bg-error/5', badge: 'badge-error', text: 'text-error' },
 };
 
 export default function DealsKanban({ deals }: { deals: Deal[] }) {
   const router = useRouter();
+  
+  // 1. Optimistic State
+  const [optimisticDeals, setOptimisticDeals] = useState<Deal[]>(deals);
   const [movingId, setMovingId] = useState<string | null>(null);
-  const [activeMobileTab, setActiveMobileTab] = useState(STAGES[0]);
+  const [activeMobileTab, setActiveMobileTab] = useState(DEFAULT_STAGES[0]);
+  
+  // Sync Status State
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSaved, setLastSaved] = useState<Date>(new Date());
+
   const containerRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const columns = STAGES.map(stage => ({
-    id: stage,
-    title: stage.charAt(0) + stage.slice(1).toLowerCase(),
-    items: deals.filter(d => d.status === stage),
-    total: deals.filter(d => d.status === stage).reduce((sum, d) => sum + d.amount, 0)
-  }));
-
-  const scrollToColumn = (stage: string) => {
-    setActiveMobileTab(stage);
-    const el = columnRefs.current[stage];
-    if (el && containerRef.current) {
-      const containerLeft = containerRef.current.getBoundingClientRect().left;
-      const elLeft = el.getBoundingClientRect().left;
-      const offset = elLeft - containerLeft + containerRef.current.scrollLeft;
-      containerRef.current.scrollTo({ left: offset - 16, behavior: 'smooth' });
+  // Sync with server data ONLY when the parent passes new distinct data (e.g. initial load)
+  // We avoid auto-syncing if we are in the middle of an operation to prevent reverts
+  useEffect(() => {
+    // Only update if we are idle (not currently dragging/saving) to prevent "jumps"
+    if (saveStatus === 'idle' || saveStatus === 'saved') {
+        setOptimisticDeals(deals);
     }
-  };
+  }, [deals]);
 
+  // 2. Column Organization
+  const columns = [...DEFAULT_STAGES, ...TERMINAL_STAGES].map(stageName => {
+    const items = optimisticDeals.filter(d => d.stage === stageName);
+    return {
+      id: stageName,
+      title: stageName,
+      items,
+      total: items.reduce((sum, d) => sum + d.amount, 0)
+    };
+  });
+
+  // 3. Handlers
   const handleDragStart = (e: React.DragEvent, dealId: string) => {
     e.dataTransfer.setData("dealId", dealId);
     e.dataTransfer.effectAllowed = "move";
+    setMovingId(dealId);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
+  const handleDragEnd = () => setMovingId(null);
 
-  const handleDrop = async (e: React.DragEvent, newStatus: string) => {
+  const handleDrop = async (e: React.DragEvent, targetStage: string) => {
     e.preventDefault();
     const dealId = e.dataTransfer.getData("dealId");
     if (!dealId) return;
-    await handleMove(dealId, newStatus);
+    await handleMove(dealId, targetStage);
   };
 
-  const handleMove = async (dealId: string, newStatus: string) => {
-    setMovingId(dealId);
-    try {
-      // Auto-set probability based on stage
-      let prob = undefined;
-      if (newStatus === 'WON') prob = 100;
-      if (newStatus === 'LOST') prob = 0;
-      if (newStatus === 'NEGOTIATION') prob = 75;
-      if (newStatus === 'PROPOSAL') prob = 50;
-      if (newStatus === 'QUALIFIED') prob = 25;
-      if (newStatus === 'NEW') prob = 10;
+  const handleMove = async (dealId: string, targetStage: string) => {
+    setSaveStatus('saving');
+    
+    // 1. Logic Calculation
+    let newStatus = 'OPEN';
+    let newProbability = 20;
 
+    if (targetStage === 'Won') {
+      newStatus = 'WON';
+      newProbability = 100;
+    } else if (targetStage === 'Lost') {
+      newStatus = 'LOST';
+      newProbability = 0;
+    } else {
+      newStatus = 'OPEN';
+      const idx = DEFAULT_STAGES.indexOf(targetStage);
+      newProbability = Math.round(((idx + 1) / DEFAULT_STAGES.length) * 80);
+    }
+
+    // 2. Optimistic Update (Immediate Feedback)
+    setOptimisticDeals(prev => prev.map(d => 
+      d.id === dealId ? { ...d, stage: targetStage, status: newStatus, probability: newProbability } : d
+    ));
+    setMovingId(null);
+
+    // 3. Server Update (Background)
+    try {
       const res = await fetch(`/api/deals/${dealId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, probability: prob })
+        body: JSON.stringify({ 
+          stage: targetStage, 
+          status: newStatus,
+          probability: newProbability 
+        })
       });
-      if (res.ok) router.refresh();
+      
+      if (!res.ok) {
+        throw new Error("Failed to save");
+      }
+      
+      // Success!
+      setSaveStatus('saved');
+      setLastSaved(new Date());
+      
+      // DO NOT call router.refresh() here. It causes the race condition.
+      // We trust our local state. The server is updated.
+      
+      setTimeout(() => setSaveStatus('idle'), 2000); // Reset status after 2s
+
     } catch (e) {
       console.error(e);
-    } finally {
-      setMovingId(null);
+      setSaveStatus('error');
+      // On error, THEN we might want to refresh to get back to reality
+      alert("Failed to save change. Refreshing...");
+      router.refresh(); 
     }
+  };
+
+  const handleManualSave = () => {
+    setSaveStatus('saving');
+    router.refresh(); // This actually fetches fresh data from DB
+    setTimeout(() => {
+        setSaveStatus('saved');
+        setLastSaved(new Date());
+    }, 800);
   };
 
   return (
     <div className="flex flex-col h-full">
-      <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-2 px-1 mb-4 sticky top-0 z-20 bg-base-300/95 backdrop-blur py-2">
-        {STAGES.map(stage => (
-          <button
-            key={stage}
-            onClick={() => scrollToColumn(stage)}
-            className={`btn btn-sm rounded-full whitespace-nowrap flex-1 transition-all ${
-              activeMobileTab === stage 
-                ? `btn-active ${STATUS_BG[stage] || 'bg-base-content/10'} border-none shadow-sm` 
-                : 'btn-ghost'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${STATUS_BG[stage]?.replace('/5', '') || 'bg-base-content/20'}`}></span>
-            {stage.charAt(0) + stage.slice(1).toLowerCase()}
-          </button>
-        ))}
+      
+      {/* Controls Header (Mobile Tabs + Desktop Save Button) */}
+      <div className="flex justify-between items-center mb-4 px-1 gap-4 sticky top-0 z-20 bg-base-300/95 backdrop-blur py-2">
+        
+        {/* Mobile Tabs */}
+        <div className="lg:hidden flex overflow-x-auto no-scrollbar gap-2 flex-1">
+            {columns.map(col => {
+            const style = STAGE_STYLES[col.id] || STAGE_STYLES['Lead'];
+            const isActive = activeMobileTab === col.id;
+            return (
+                <button
+                key={col.id}
+                onClick={() => {
+                    setActiveMobileTab(col.id);
+                    columnRefs.current[col.id]?.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+                }}
+                className={`btn btn-sm rounded-full whitespace-nowrap flex-1 transition-all ${
+                    isActive ? `btn-active border-none shadow-sm ${style.bg} ${style.text}` : 'btn-ghost'
+                }`}
+                >
+                {col.title} <span className="opacity-50 text-[10px] ml-1">{col.items.length}</span>
+                </button>
+            );
+            })}
+        </div>
+
+        {/* Sync Status / Manual Save (Visible on both) */}
+        <div className="flex items-center gap-2 ml-auto">
+            <span className="text-[10px] uppercase font-bold opacity-40 hidden sm:block">
+                {saveStatus === 'saving' ? 'Syncing...' : 
+                 saveStatus === 'saved' ? 'Saved' : 
+                 saveStatus === 'error' ? 'Error' : 
+                 `Last sync: ${lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+            </span>
+            
+            <button 
+                onClick={handleManualSave} 
+                disabled={saveStatus === 'saving'}
+                className={`btn btn-sm gap-2 ${saveStatus === 'error' ? 'btn-error' : 'btn-ghost bg-base-100 shadow-sm'}`}
+            >
+                {saveStatus === 'saving' ? (
+                    <span className="loading loading-spinner loading-xs"></span>
+                ) : saveStatus === 'saved' ? (
+                    <CheckCircleIcon className="w-4 h-4 text-success" />
+                ) : (
+                    <ArrowPathIcon className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Force Save</span>
+            </button>
+        </div>
       </div>
 
+      {/* Board Container */}
       <div 
         ref={containerRef}
-        className="flex-1 flex overflow-x-auto snap-x snap-mandatory gap-4 px-1 pb-4 no-scrollbar lg:gap-6 lg:overflow-hidden"
+        // DESKTOP LAYOUT FIX: Changed from grid to flex with flex-1/min-w-0 to force fit without scroll
+        className="flex-1 lg:flex lg:gap-3 flex overflow-x-auto snap-x snap-mandatory gap-4 px-4 pb-4 custom-scrollbar"
       >
-        {columns.map((col) => (
-          <div 
-            key={col.id} 
-            ref={el => { columnRefs.current[col.id] = el; }}
-            className="snap-center shrink-0 w-[85vw] md:w-[320px] lg:flex-1 lg:min-w-0 flex flex-col h-full rounded-2xl bg-base-200/30 border border-base-200"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, col.id)}
-          >
-            <div className={`p-3 border-b border-base-200 flex justify-between items-center rounded-t-2xl bg-base-100/50 backdrop-blur-sm sticky top-0 z-10 border-t-4 ${STATUS_COLORS[col.id]?.split(' ')[0] || 'border-base-300'}`}>
-              <div className="flex items-center gap-2">
-                <h3 className={`font-black text-sm tracking-tight ${STATUS_COLORS[col.id]?.split(' ')[1] || ''}`}>
-                  {col.title}
-                </h3>
-                <span className="badge badge-xs badge-ghost font-mono">{col.items.length}</span>
-              </div>
-              <div className="text-xs font-bold opacity-40 font-mono">
-                ${col.total.toLocaleString()}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-              {col.items.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-base-content/20 text-xs italic min-h-[150px] border-2 border-dashed border-base-content/5 rounded-xl m-2">
-                  <span>Drag deals here</span>
+        {columns.map((col) => {
+          const style = STAGE_STYLES[col.id] || STAGE_STYLES['Lead'];
+          
+          return (
+            <div 
+              key={col.id} 
+              ref={el => { columnRefs.current[col.id] = el; }}
+              // flex-1 on desktop forces equal width filling the screen
+              className={`
+                snap-center shrink-0 w-[85vw] md:w-[320px] 
+                lg:w-auto lg:flex-1 lg:min-w-0
+                flex flex-col h-full rounded-2xl ${style.bg} border border-base-200 transition-colors duration-300
+              `}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+              onDrop={(e) => handleDrop(e, col.id)}
+            >
+              {/* Header */}
+              <div className={`p-2 border-b border-base-200 flex justify-between items-center rounded-t-2xl bg-base-100/50 backdrop-blur-sm sticky top-0 z-10 border-t-4 ${style.border}`}>
+                <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                  <h3 className={`font-black text-xs tracking-tight truncate ${style.text}`}>{col.title}</h3>
+                  <span className={`badge badge-xs ${style.badge} font-mono shrink-0`}>{col.items.length}</span>
                 </div>
-              )}
-              
-              {col.items.map((deal) => (
-                <div 
-                  key={deal.id} 
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, deal.id)}
-                  className={`
-                    card bg-base-100 shadow-sm border border-base-100 hover:shadow-md hover:border-primary/20 transition-all cursor-grab active:cursor-grabbing group
-                    ${movingId === deal.id ? 'opacity-40 scale-95' : ''}
-                  `}
-                >
-                  <div className="card-body p-3 gap-1.5">
-                    <div className="flex justify-between items-start">
-                      <Link href={`/deals/${deal.id}`} className="font-bold text-sm leading-tight line-clamp-2 hover:text-primary transition-colors">
-                        {deal.title}
-                      </Link>
-                      
-                      <div className="dropdown dropdown-end lg:hidden">
-                        <div tabIndex={0} role="button" className="btn btn-xs btn-ghost btn-circle -mt-1 -mr-1">
-                          <EllipsisHorizontalIcon className="w-4 h-4" />
+                <div className="text-[10px] font-bold opacity-40 font-mono shrink-0">
+                  ${col.total >= 1000 ? `${(col.total/1000).toFixed(1)}k` : col.total}
+                </div>
+              </div>
+
+              {/* Drop Zone */}
+              <div className="flex-1 overflow-y-auto p-1.5 space-y-2 custom-scrollbar min-h-[100px]">
+                {col.items.map((deal) => (
+                  <div 
+                    key={deal.id} 
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, deal.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`
+                      card bg-base-100 shadow-sm border border-base-100 hover:shadow-md hover:border-primary/20 transition-all cursor-grab active:cursor-grabbing group select-none
+                      ${movingId === deal.id ? 'opacity-40 scale-95 grayscale' : ''}
+                    `}
+                  >
+                    <div className="card-body p-2 gap-1">
+                      <div className="flex justify-between items-start">
+                        <Link href={`/deals/${deal.id}`} className="font-bold text-xs leading-tight line-clamp-2 hover:text-primary transition-colors">
+                          {deal.title}
+                        </Link>
+                        
+                        {/* Mobile Move Menu */}
+                        <div className="dropdown dropdown-end lg:hidden">
+                          <div tabIndex={0} role="button" className="btn btn-xs btn-ghost btn-circle -mt-1 -mr-1">
+                            <EllipsisHorizontalIcon className="w-3 h-3" />
+                          </div>
+                          <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-32 border border-base-200 text-xs">
+                            {columns.filter(c => c.id !== col.id).map(c => (
+                              <li key={c.id}>
+                                <button onClick={() => handleMove(deal.id, c.id)}>{c.title}</button>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow-xl bg-base-100 rounded-box w-40 border border-base-200 text-xs">
-                          <li className="menu-title opacity-50 px-2 py-1">Move to...</li>
-                          {STAGES.filter(s => s !== col.id).map(s => (
-                            <li key={s}>
-                              <button onClick={() => handleMove(deal.id, s)}>
-                                {s.charAt(0) + s.slice(1).toLowerCase()}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
                       </div>
-                    </div>
 
-                    <div className="text-base font-black tracking-tight flex items-center gap-2">
-                       ${deal.amount.toLocaleString()}
-                       {col.id === 'WON' && <span className="badge badge-xs badge-success badge-outline">Paid</span>}
-                    </div>
-
-                    <div className="flex justify-between items-end mt-1 pt-2 border-t border-base-content/5">
-                      <div className="flex -space-x-1.5">
-                         {deal.contacts.slice(0, 2).map(c => (
-                           <div key={c.id} className="avatar w-4 h-4 ring-1 ring-base-100 rounded-full" title={c.name}>
-                             {c.imageUrl ? (
-                               <img src={c.imageUrl} alt={c.name} className="rounded-full" />
-                             ) : (
-                               <div className="bg-neutral text-neutral-content text-[6px] flex items-center justify-center w-full h-full font-bold">{c.name.charAt(0)}</div>
-                             )}
-                           </div>
-                         ))}
+                      <div className="text-sm font-black tracking-tight flex items-center gap-2">
+                         ${deal.amount.toLocaleString()}
                       </div>
-                      
-                      <span className={`text-[9px] font-mono flex items-center gap-1 ${deal.closeDate ? 'text-primary' : 'opacity-40'}`}>
-                         <CalendarIcon className="w-3 h-3" />
-                         {deal.closeDate 
-                            ? new Date(deal.closeDate).toLocaleDateString(undefined, {month:'short', day:'numeric'})
-                            : new Date(deal.updatedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'})
-                         }
-                      </span>
+
+                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-base-content/5">
+                        <div className="flex -space-x-1.5">
+                           {deal.contacts.slice(0, 2).map(c => (
+                             <div key={c.id} className="avatar w-4 h-4 ring-1 ring-base-100 rounded-full">
+                               {c.imageUrl ? (
+                                 <img src={c.imageUrl} alt={c.name} className="rounded-full" />
+                               ) : (
+                                 <div className="bg-neutral text-neutral-content text-[6px] flex items-center justify-center w-full h-full font-bold">{c.name.charAt(0)}</div>
+                               )}
+                             </div>
+                           ))}
+                        </div>
+                        <span className="text-[9px] font-mono flex items-center gap-1 opacity-40">
+                           <CalendarIcon className="w-3 h-3" />
+                           {deal.updatedAt ? new Date(deal.updatedAt).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : ''}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

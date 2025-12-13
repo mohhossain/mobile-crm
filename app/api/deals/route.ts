@@ -9,6 +9,13 @@ const toSafeDate = (dateStr: any): Date | null => {
   return date;
 };
 
+// Default Job Sheet Stages
+const DEFAULT_ROADMAP = [
+  { id: "stage-1", title: "Prep", status: "ACTIVE" },
+  { id: "stage-2", title: "The Work", status: "PENDING" },
+  { id: "stage-3", title: "Wrap Up", "status": "PENDING" }
+];
+
 export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +26,7 @@ export async function GET() {
             include: {
                 tags: true,
                 contacts: true,
-                lineItems: true, // Fetch Line Items
+                lineItems: true,
                 notes: { include: { user: true } },
                 expenses: true,
             },
@@ -36,7 +43,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { title, amount, tags, status, contactIds, closeDate, notes, expenses, lineItems } = body;
+  const { title, amount, tags, contactIds, closeDate, notes, expenses, lineItems } = body;
 
   const safeTags = Array.isArray(tags) ? tags : [];
   const safeContactIds = Array.isArray(contactIds) ? contactIds : [];
@@ -50,9 +57,12 @@ export async function POST(request: Request) {
       data: {
         title,
         amount: parsedAmount,
-        status: status || "PENDING",
+        status: "OPEN", // Always start OPEN
+        stage: "Lead",  // Always start in Lead column
+        probability: 20,
         userId: user.id,
-        closeDate: toSafeDate(closeDate), 
+        closeDate: toSafeDate(closeDate),
+        roadmap: DEFAULT_ROADMAP,
         
         tags: safeTags.length > 0 ? {
           connectOrCreate: safeTags.map((tag: string) => ({
@@ -82,13 +92,12 @@ export async function POST(request: Request) {
           }))
         } : undefined,
 
-        // NEW: Create Line Items
         lineItems: safeLineItems.length > 0 ? {
           create: safeLineItems.map((item: any) => ({
             name: item.name,
             quantity: Number(item.quantity),
             price: Number(item.price),
-            productId: item.productId || null // Link to product if ID exists
+            productId: item.productId || null
           }))
         } : undefined
       },
@@ -101,7 +110,6 @@ export async function POST(request: Request) {
   }
 }
 
-// ... (DELETE remains the same) ...
 export async function DELETE(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

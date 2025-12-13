@@ -8,6 +8,7 @@ import {
   TrashIcon, 
   CalendarIcon
 } from "@heroicons/react/24/outline";
+import AddExpense from "./AddExpense";
 
 interface Expense {
   id: string;
@@ -25,15 +26,7 @@ interface Props {
 
 export default function DealFinances({ dealId, dealAmount, expenses }: Props) {
   const [items, setItems] = useState<Expense[]>(expenses);
-  const [loading, setLoading] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  
-  // Form State
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("LABOR");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-
   const router = useRouter();
 
   useEffect(() => {
@@ -43,40 +36,6 @@ export default function DealFinances({ dealId, dealAmount, expenses }: Props) {
   const totalExpenses = items.reduce((sum, item) => sum + item.amount, 0);
   const netProfit = dealAmount - totalExpenses;
   const profitMargin = dealAmount !== 0 ? (netProfit / dealAmount) * 100 : 0;
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!desc || !amount) return;
-    setLoading(true);
-
-    try {
-      const res = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          description: desc, 
-          amount, 
-          category, 
-          dealId,
-          date 
-        }),
-      });
-
-      if (res.ok) {
-        const newExpense = await res.json();
-        setItems((prev) => [newExpense, ...prev]);
-        setDesc("");
-        setAmount("");
-        setDate(new Date().toISOString().split('T')[0]);
-        setIsAdding(false);
-        router.refresh();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete expense?")) return;
@@ -91,6 +50,11 @@ export default function DealFinances({ dealId, dealAmount, expenses }: Props) {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const handleAddSuccess = () => {
+    setIsAdding(false);
+    router.refresh();
   };
 
   return (
@@ -134,45 +98,14 @@ export default function DealFinances({ dealId, dealAmount, expenses }: Props) {
               <PlusIcon className="w-4 h-4" /> Add Expense
             </button>
           ) : (
-            <form onSubmit={handleAdd} className="bg-base-200 p-3 rounded-xl animate-in fade-in slide-in-from-top-1 border border-base-300">
-              <input 
-                className="input input-sm input-bordered w-full mb-2" 
-                placeholder="Description (e.g. Server Cost)"
-                value={desc}
-                onChange={e => setDesc(e.target.value)}
-                autoFocus
+            <div className="bg-base-200 p-3 rounded-xl animate-in fade-in slide-in-from-top-1 border border-base-300">
+              {/* FIX: Using the standalone AddExpense component instead of inline form */}
+              <AddExpense 
+                dealId={dealId} 
+                onSuccess={handleAddSuccess} 
+                onCancel={() => setIsAdding(false)} 
               />
-              <div className="flex gap-2 mb-2">
-                <input 
-                  type="number" 
-                  className="input input-sm input-bordered w-1/2" 
-                  placeholder="Amount"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                />
-                <select 
-                  className="select select-sm select-bordered w-1/2"
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                >
-                  <option value="LABOR">Labor</option>
-                  <option value="SOFTWARE">Software</option>
-                  <option value="MATERIAL">Material</option>
-                  <option value="TRAVEL">Travel</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-              <input 
-                type="date"
-                className="input input-sm input-bordered w-full mb-2"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-              />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setIsAdding(false)} className="btn btn-sm btn-ghost flex-1">Cancel</button>
-                <button type="submit" disabled={loading} className="btn btn-sm btn-primary flex-1">Add</button>
-              </div>
-            </form>
+            </div>
           )}
         </div>
 
@@ -195,7 +128,6 @@ export default function DealFinances({ dealId, dealAmount, expenses }: Props) {
               <div className="flex items-center gap-2">
                 <span className="text-error font-mono font-bold">-${item.amount.toLocaleString()}</span>
                 
-                {/* FIX: Changed opacity logic. Visible on mobile (default), hidden until hover on desktop (lg:) */}
                 <button 
                   onClick={() => handleDelete(item.id)} 
                   className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 btn btn-ghost btn-xs btn-square text-gray-400 hover:text-error transition-opacity"

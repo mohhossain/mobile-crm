@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/currentUser';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // ... (Keep GET as is) ...
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const tasks = await prisma.task.findMany({
@@ -14,22 +13,15 @@ export async function GET() {
   return NextResponse.json(tasks);
 }
 
-// Helper to parse dates safely and prevent -1 day errors
 const toSafeISO = (dateStr: any): Date | null => {
   if (!dateStr) return null;
-  
-  // If it's already a full ISO string (has 'T'), use it
   if (typeof dateStr === 'string' && dateStr.includes('T')) {
     const date = new Date(dateStr);
     return isNaN(date.getTime()) ? null : date;
   }
-
-  // If it's just YYYY-MM-DD, append Noon UTC to avoid timezone shifts
   if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return new Date(`${dateStr}T12:00:00.000Z`);
   }
-
-  // Fallback
   const date = new Date(dateStr);
   return isNaN(date.getTime()) ? null : date;
 };
@@ -40,7 +32,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { title, description, priority, startDate, dueDate, dealId, contactIds } = body;
+    const { title, description, priority, startDate, dueDate, dealId, contactIds, stage } = body;
 
     const validContactIds = Array.isArray(contactIds) 
       ? contactIds.filter((id: any) => typeof id === 'string') 
@@ -51,11 +43,14 @@ export async function POST(req: Request) {
         title,
         description: description || "",
         priority: priority ? parseInt(priority, 10) : 1,
-        // FIX: Use robust date parser
         startDate: toSafeISO(startDate),
         dueDate: toSafeISO(dueDate),
         userId: user.id,
         dealId: (typeof dealId === 'string' && dealId.length > 0) ? dealId : null,
+        
+        // NEW: Assign to Stage
+        stage: stage || null,
+
         contacts: {
           connect: validContactIds.map((id: string) => ({ id })),
         },

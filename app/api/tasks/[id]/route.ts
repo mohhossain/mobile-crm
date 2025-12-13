@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/currentUser'
 
-// Helper to safely parse dates (reused)
 const toSafeDate = (dateStr: any): Date | null => {
   if (!dateStr) return null;
   const date = new Date(dateStr);
@@ -19,7 +18,7 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { status, title, description, priority, dueDate } = body
+  const { status, title, description, priority, dueDate, stage } = body
 
   try {
     const updateData: any = {};
@@ -27,8 +26,8 @@ export async function PUT(
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (priority !== undefined) updateData.priority = Number(priority);
+    if (stage !== undefined) updateData.stage = stage; // Allow moving tasks between stages
     
-    // Fix: Explicitly handle date parsing
     if (dueDate !== undefined) {
       updateData.dueDate = toSafeDate(dueDate);
     }

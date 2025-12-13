@@ -72,19 +72,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-base-200">
-         <div className="bg-base-200/50 rounded-xl p-4">
-            <h4 className="text-xs font-bold uppercase text-base-content/40 mb-2">Quick Actions</h4>
-            <div className="grid grid-cols-2 gap-2">
-               <Link href="/deals" className="btn btn-xs btn-outline bg-base-100 border-base-300 w-full">
-                 <PlusIcon className="w-3 h-3" /> Deal
-               </Link>
-               <Link href="/tasks" className="btn btn-xs btn-outline bg-base-100 border-base-300 w-full">
-                 <PlusIcon className="w-3 h-3" /> Task
-               </Link>
-            </div>
-         </div>
-      </div>
+      
     </aside>
   );
 }

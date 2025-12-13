@@ -60,16 +60,11 @@ export default async function RootLayout({
                   {/* Header: Fixed at top of content column */}
                   <header className="flex-none h-16 pt-safe flex justify-between items-center px-6 gap-4 bg-base-100/50 backdrop-blur-md z-40 border-b border-base-200 lg:bg-transparent lg:border-none">
                     
-                    <div className="flex items-center gap-2 lg:hidden">
-                       <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                       <span className="font-mono text-[10px] font-bold tracking-widest opacity-50 border border-base-content/20 px-1.5 py-0.5 rounded">
-                         v1.3 BETA
-                       </span>
-                    </div>
+                    <div></div>
                     
                     <div className="hidden lg:block"></div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
                       <UserButton
                         appearance={{
                           elements: {

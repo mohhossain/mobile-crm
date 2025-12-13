@@ -2,376 +2,342 @@ import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { 
-  PlusIcon, 
   ExclamationCircleIcon,
   ClockIcon,
-  FireIcon,
-  ChatBubbleLeftRightIcon,
   ChartBarIcon,
-  BellAlertIcon,
-  CalendarDaysIcon,
+  ArrowTrendingUpIcon,
+  BanknotesIcon,
+  ClipboardDocumentListIcon,
+  BriefcaseIcon,
   CheckCircleIcon,
-  UserIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  DocumentTextIcon
 } from "@heroicons/react/24/solid";
-import ContactCard from "./components/Contact";
-import DealCard from "./components/DealCard";
-import TaskCard from "./components/TaskCard";
 import FinancialPulseCard from "./components/FinancialPulseCard";
-import ContactListWidget from "./components/ContactListWidget";
 import HomeActions from "./components/HomeActions";
 import LandingPage from "./components/LandingPage";
 
 // --- TYPES ---
 type AlertType = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
 
-interface SmartAlert {
-  id: string;
-  type: AlertType;
-  message: string;
-  subtext?: string;
-  link: string;
-  icon: any;
-}
-
 async function getSmartDashboardData(userId: string) {
   const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-
-  // Safe aggregation helper
-  const safeAggregate = async () => {
-    try {
-      const result = await prisma.expense.aggregate({
-        where: { userId },
-        _sum: { amount: true }
-      });
-      return result._sum.amount || 0;
-    } catch (e) {
-      console.error("Expense aggregation failed:", e);
-      return 0;
-    }
-  };
-
-  const [deals, tasks, rawContacts, rawNotes, rawExpenses, expenseTotal] = await Promise.all([
-    prisma.deal.findMany({
-      where: { userId },
-      include: { 
-        tags: true, 
-        contacts: { select: { id: true, name: true, imageUrl: true } } 
-      },
-      orderBy: { updatedAt: 'desc' }
-    }),
-    prisma.task.findMany({
-      where: { userId, status: { not: 'DONE' } },
-      include: { deal: true },
-      orderBy: { dueDate: 'asc' }
-    }),
-    // FIX: Include company relation to access the name
-    prisma.contact.findMany({
-      where: { userId },
-      include: { 
-        tags: true,
-        company: true 
-      },
-      orderBy: { lastContactedAt: 'desc' }
-    }),
-    prisma.note.findMany({
-      where: { userId },
-      take: 20, 
-      orderBy: { createdAt: 'desc' },
-      include: { deal: true, contact: true }
-    }),
-    prisma.expense.findMany({
-      where: { userId },
-      take: 20,
-      orderBy: { createdAt: 'desc' },
-      include: { deal: true }
-    }),
-    safeAggregate()
-  ]);
-
-  // --- 0. DATA TRANSFORMATION (Fix Type Error) ---
-  const contacts = rawContacts.map(c => ({
-    ...c,
-    company: c.company?.name || c.companyName || null,
-    tags: c.tags.map(t => ({ id: t.id, name: t.name })) 
-  }));
-
-  // --- 1. GENERATE SMART ALERTS ---
-  const alerts: SmartAlert[] = [];
-
-  // A. Urgent Tasks Logic (Overdue + Due Today)
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 
-  const urgentTasks = tasks.filter(t => {
-    if (!t.dueDate) return false;
-    const due = new Date(t.dueDate);
-    return due <= endOfToday;
-  });
+  // Parallel Data Fetching
+  const [deals, tasks, invoices, expenses, activityNotes] = await Promise.all([
+    // 1. Deals
+    prisma.deal.findMany({
+      where: { userId },
+      select: { id: true, title: true, amount: true, status: true, updatedAt: true, probability: true }
+    }),
+    // 2. Urgent Tasks (Due today or overdue)
+    prisma.task.findMany({
+      where: { 
+        userId, 
+        status: { not: 'DONE' },
+        dueDate: { lte: endOfToday } 
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 5,
+      include: { deal: { select: { title: true } } }
+    }),
+    // 3. Invoices (For Cash Flow)
+    prisma.invoice.findMany({
+      where: { userId },
+      select: { id: true, number: true, amount: true, status: true, dueDate: true, deal: { select: { title: true } } }
+    }),
+    // 4. Expenses (For Net Profit)
+    prisma.expense.aggregate({
+      where: { userId },
+      _sum: { amount: true }
+    }),
+    // 5. Recent Notes (Activity)
+    prisma.note.findMany({
+      where: { userId },
+      take: 6,
+      orderBy: { createdAt: 'desc' },
+      include: { 
+        deal: { select: { title: true, id: true } },
+        contact: { select: { name: true, id: true } } // Added Contact for linking
+      }
+    })
+  ]);
 
-  if (urgentTasks.length > 0) {
-    alerts.push({
-      id: 'overdue-tasks',
-      type: 'CRITICAL',
-      message: `You have ${urgentTasks.length} urgent tasks.`,
-      subtext: "Due today or overdue.",
-      link: '/tasks?filter=active',
-      icon: ExclamationCircleIcon
-    });
-  }
+  // --- METRIC CALCULATIONS ---
 
-  // B. Closing Soon (Info)
-  const closingDeals = deals.filter(d => d.closeDate && new Date(d.closeDate) <= threeDaysFromNow && new Date(d.closeDate) >= now && d.status !== 'WON' && d.status !== 'LOST');
-  if (closingDeals.length > 0) {
-    alerts.push({
-      id: 'closing-soon',
-      type: 'INFO',
-      message: `${closingDeals.length} deals scheduled to close soon.`,
-      subtext: "Review them to ensure they land.",
-      link: '/deals',
-      icon: CalendarDaysIcon
-    });
-  }
-
-  // C. Stale Deals (Warning)
-  const staleDeals = deals.filter(
-    d => ['NEGOTIATION', 'PENDING'].includes(d.status) && 
-    new Date(d.updatedAt) < sevenDaysAgo
-  );
-  if (staleDeals.length > 0) {
-    alerts.push({
-      id: 'stale-deals',
-      type: 'WARNING',
-      message: `${staleDeals.length} deals are stalling.`,
-      subtext: "No activity in 7+ days.",
-      link: '/deals',
-      icon: ClockIcon
-    });
-  }
-
-  // D. Slipping Contacts (Warning)
-  const slippingContacts = contacts.filter(c => 
-    c.lastContactedAt && new Date(c.lastContactedAt) < fourteenDaysAgo
-  ).slice(0, 3); 
+  // 1. Cash & Revenue
+  const wonDeals = deals.filter(d => d.status === 'WON');
+  const revenueYTD = wonDeals.reduce((sum, d) => sum + d.amount, 0);
+  const totalExpenses = expenses._sum.amount || 0;
   
-  if (slippingContacts.length > 0) {
-    alerts.push({
-      id: 'slipping-contacts',
-      type: 'WARNING',
-      message: `${slippingContacts.length} contacts are slipping away.`,
-      subtext: "Reconnect with your network.",
-      link: '/contacts',
-      icon: UserIcon
-    });
-  }
-
-  // --- 2. CLEAN & MIX ACTIVITIES ---
-  const activities = [
-    ...rawNotes
-      .filter(n => {
-        if (n.dealId && !n.deal) return false;
-        if (n.contactId && !n.contact) return false;
-        if (!n.deal && !n.contact) return false;
-        return true;
-      })
-      .map(n => ({ type: 'NOTE', date: n.createdAt, data: n, deal: n.deal })),
-
-    ...rawExpenses
-      .filter(e => {
-        if (e.dealId && !e.deal) return false;
-        return !!e.deal;
-      })
-      .map(e => ({ type: 'EXPENSE', date: e.createdAt, data: e, deal: e.deal }))
-  ]
-  .sort((a, b) => b.date.getTime() - a.date.getTime())
-  .slice(0, 6);
-
-  // --- 3. FINANCIALS ---
-  const wonRevenue = deals.filter(d => d.status === 'WON').reduce((sum, d) => sum + d.amount, 0);
-  const totalExpenses = expenseTotal;
-  const netProfit = wonRevenue - totalExpenses;
-  const activeDeals = deals.filter(d => ['NEGOTIATION', 'PENDING', 'OPEN'].includes(d.status));
+  // 2. "The Chase List" (Money Owed)
+  const pendingInvoices = invoices.filter(i => i.status === 'SENT' || i.status === 'OVERDUE');
+  const pendingCash = pendingInvoices.reduce((sum, i) => sum + i.amount, 0);
+  
+  // 3. Pipeline Health
+  const activeDeals = deals.filter(d => !['WON', 'LOST', 'CANCELLED'].includes(d.status));
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
+  const weightedPipeline = activeDeals.reduce((sum, d) => sum + (d.amount * (d.probability / 100)), 0);
 
-  // FIX: Use the transformed 'contacts' array for the active list
-  const activeContacts = contacts.filter(c => c.lastContactedAt && new Date(c.lastContactedAt) >= sevenDaysAgo).slice(0, 10);
+  // 4. Stale Deals (No update in 7 days)
+  const staleDeals = activeDeals.filter(d => new Date(d.updatedAt) < sevenDaysAgo);
 
   return {
-    alerts,
-    activeDealsCount: activeDeals.length,
-    pipelineValue,
-    staleDeals, 
-    activeContacts,
-    activities, 
-    recentDeals: deals.slice(0, 3),
-    urgentTasks,
-    financials: {
-      revenue: wonRevenue,
-      expenses: totalExpenses,
-      profit: netProfit,
+    metrics: {
+      revenueYTD,
+      netProfit: revenueYTD - totalExpenses,
+      pendingCash,
+      activeDealCount: activeDeals.length,
+      urgentTaskCount: tasks.length,
+      pipelineValue,
+      weightedPipeline
+    },
+    lists: {
+      urgentTasks: tasks,
+      pendingInvoices,
+      staleDeals,
+      recentActivity: activityNotes
+    },
+    raw: {
+      expenses: totalExpenses
     }
   };
 }
 
 export default async function Home() {
   const user = await getCurrentUser();
-  if (!user) return <LandingPage />
+  if (!user) return <LandingPage />;
 
   const data = await getSmartDashboardData(user.id);
+  const { metrics, lists } = data;
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Helper for Alert Styling
-  const getAlertStyle = (type: AlertType) => {
-    switch (type) {
-      case 'CRITICAL': return 'text-error';
-      case 'WARNING': return 'text-warning';
-      case 'INFO': return 'text-info';
-      case 'SUCCESS': return 'text-success';
-      default: return 'text-base-content';
-    }
-  };
-
   return (
-    <div className="space-y-8 pb-24">
+    <div className="space-y-8 pb-32">
       
-      {/* 1. HEADER SECTION */}
+      {/* 1. HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-base-content">
             {greeting}, {user.name.split(' ')[0]}
           </h1>
           <p className="text-base-content/60 mt-1 font-medium">
-            {data.alerts.length > 0 
-              ? `You have ${data.alerts.length} items needing attention.` 
-              : "You are all caught up. Great work!"}
+            Here's your business pulse for today.
           </p>
         </div>
+        <HomeActions />
+      </div>
+
+      {/* 2. "THE PULSE" TILES (Top Stats) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
-        <div className="w-full md:w-auto flex justify-end">
-          {/* FIX: Removed alerts prop */}
-          <HomeActions />
+        {/* Metric 1: Active Pipeline */}
+        <div className="stats shadow-sm border border-base-200 bg-base-100">
+          <div className="stat p-4">
+            <div className="stat-figure text-primary bg-primary/10 p-2 rounded-lg">
+              <ChartBarIcon className="w-5 h-5" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60">Pipeline</div>
+            <div className="stat-value text-lg lg:text-2xl">${metrics.pipelineValue.toLocaleString()}</div>
+            <div className="stat-desc text-xs">{metrics.activeDealCount} active deals</div>
+          </div>
+        </div>
+
+        {/* Metric 2: Pending Cash (The Chase) */}
+        <div className="stats shadow-sm border border-base-200 bg-base-100">
+          <div className="stat p-4">
+            <div className={`stat-figure p-2 rounded-lg ${metrics.pendingCash > 0 ? 'text-warning bg-warning/10' : 'text-base-content/20 bg-base-200'}`}>
+              <BanknotesIcon className="w-5 h-5" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60">Pending Cash</div>
+            <div className="stat-value text-lg lg:text-2xl">${metrics.pendingCash.toLocaleString()}</div>
+            <div className="stat-desc text-xs">{lists.pendingInvoices.length} invoices sent</div>
+          </div>
+        </div>
+
+        {/* Metric 3: Urgent Tasks */}
+        <div className="stats shadow-sm border border-base-200 bg-base-100">
+          <div className="stat p-4">
+            <div className={`stat-figure p-2 rounded-lg ${metrics.urgentTaskCount > 0 ? 'text-error bg-error/10' : 'text-success bg-success/10'}`}>
+              <ClipboardDocumentListIcon className="w-5 h-5" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60">Urgent</div>
+            <div className="stat-value text-lg lg:text-2xl">{metrics.urgentTaskCount}</div>
+            <div className="stat-desc text-xs">Tasks due today</div>
+          </div>
+        </div>
+
+        {/* Metric 4: Net Profit (YTD) */}
+        <div className="stats shadow-sm border border-base-200 bg-base-100">
+          <div className="stat p-4">
+            <div className="stat-figure text-success bg-success/10 p-2 rounded-lg">
+              <ArrowTrendingUpIcon className="w-5 h-5" />
+            </div>
+            <div className="stat-title text-xs font-bold uppercase opacity-60">Net Profit</div>
+            <div className="stat-value text-lg lg:text-2xl">${metrics.netProfit.toLocaleString()}</div>
+            <div className="stat-desc text-xs">YTD</div>
+          </div>
         </div>
       </div>
 
-      {/* 2. MAIN GRID LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* 3. MAIN COCKPIT (Split Layout) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         
-        {/* RIGHT COLUMN (Insights) */}
-        <div className="lg:col-span-4 lg:col-start-9 space-y-6">
-           <FinancialPulseCard financials={data.financials} />
+        {/* LEFT COLUMN (2/3): Financials & Pipeline */}
+        <div className="lg:col-span-2 space-y-6">
+           
+           {/* Financial Card */}
+           <FinancialPulseCard financials={{ 
+             revenue: metrics.revenueYTD, 
+             expenses: data.raw.expenses, 
+             profit: metrics.netProfit 
+           }} />
 
+           {/* Pipeline Health (Stale Deals) */}
            <div className="card bg-base-100 shadow-sm border border-base-200">
-             <div className="card-body p-5">
-               <h3 className="text-xs font-bold uppercase text-base-content/40 flex items-center gap-2 mb-4 tracking-widest"><ChartBarIcon className="w-4 h-4" /> Active Pipeline</h3>
-               <div className="text-2xl font-bold text-base-content mb-1">${data.pipelineValue.toLocaleString()}</div>
-               <div className="text-xs text-base-content/60 mb-4">Potential value across {data.activeDealsCount} active deals</div>
-               <Link href="/deals" className="btn btn-xs btn-outline w-full">Go to Pipeline</Link>
-             </div>
+              <div className="card-body p-5">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold uppercase text-base-content/50 flex items-center gap-2">
+                      <BriefcaseIcon className="w-4 h-4" /> Pipeline Health
+                    </h3>
+                    <Link href="/deals" className="btn btn-xs btn-ghost">View All</Link>
+                 </div>
+
+                 {lists.staleDeals.length === 0 ? (
+                   <div className="bg-success/5 border border-success/10 rounded-xl p-4 flex items-center gap-3 text-success">
+                      <CheckCircleIcon className="w-6 h-6" />
+                      <span className="text-sm font-medium">Pipeline is moving! No stalled deals.</span>
+                   </div>
+                 ) : (
+                   <div className="space-y-3">
+                      <div className="text-xs text-warning font-bold uppercase tracking-wider">
+                        Needs Attention ({lists.staleDeals.length})
+                      </div>
+                      {lists.staleDeals.slice(0, 3).map(deal => (
+                        <Link href={`/deals/${deal.id}`} key={deal.id} className="flex justify-between items-center p-3 bg-base-200/50 hover:bg-base-200 rounded-lg transition-colors group">
+                           <div>
+                             <div className="font-bold text-sm">{deal.title}</div>
+                             <div className="text-xs opacity-50">Stuck in {deal.status} for 7+ days</div>
+                           </div>
+                           <div className="flex items-center gap-3">
+                             <span className="font-mono font-bold text-sm">${deal.amount.toLocaleString()}</span>
+                             <ChevronRightIcon className="w-4 h-4 opacity-20 group-hover:opacity-100" />
+                           </div>
+                        </Link>
+                      ))}
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+
+        {/* RIGHT COLUMN (1/3): The "Chase List" (Action Center) */}
+        <div className="space-y-6">
+           
+           {/* Action Center Card - Compact Mode */}
+           <div className="card bg-base-100 shadow-sm border border-base-200">
+              <div className="card-body p-0">
+                 <div className="p-3 border-b border-base-200 bg-base-50/50 rounded-t-xl">
+                    <h3 className="font-black text-sm uppercase tracking-wide opacity-70 flex items-center gap-2">
+                      <ExclamationCircleIcon className="w-4 h-4 text-secondary" /> Action Center
+                    </h3>
+                 </div>
+
+                 {/* 1. Unpaid Invoices Section */}
+                 <div className="p-3 border-b border-base-200">
+                    <div className="text-[10px] font-bold uppercase text-base-content/40 mb-2 flex justify-between">
+                       <span>Money Owed</span>
+                       <span>${metrics.pendingCash.toLocaleString()}</span>
+                    </div>
+                    {lists.pendingInvoices.length === 0 ? (
+                      <p className="text-xs text-base-content/40 italic">All invoices paid.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {lists.pendingInvoices.slice(0, 3).map(inv => (
+                          <Link href={`/deals/${(inv as any).dealId || ''}?tab=invoices`} key={inv.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-base-200 transition text-xs">
+                             <div className="flex items-center gap-2">
+                                <DocumentTextIcon className="w-3 h-3 text-warning" />
+                                <span className="font-medium truncate max-w-[120px]">{inv.deal?.title || inv.number}</span>
+                             </div>
+                             <span className="font-mono font-bold">${inv.amount.toLocaleString()}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+
+                 {/* 2. Urgent Tasks Section */}
+                 <div className="p-3">
+                    <div className="text-[10px] font-bold uppercase text-base-content/40 mb-2">
+                       Due Today
+                    </div>
+                    {lists.urgentTasks.length === 0 ? (
+                      <p className="text-xs text-base-content/40 italic">No urgent tasks.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {lists.urgentTasks.map(task => (
+                          <Link href={`/tasks`} key={task.id} className="flex items-start gap-2 p-2 hover:bg-base-200 rounded-lg transition text-xs group cursor-pointer">
+                             <div className="mt-1 w-1.5 h-1.5 rounded-full bg-error shrink-0"></div>
+                             <div className="flex-1 min-w-0">
+                               <div className="font-medium truncate">{task.title}</div>
+                               {task.deal && <div className="text-[10px] opacity-50 truncate">{task.deal.title}</div>}
+                             </div>
+                             <div className="text-[10px] opacity-40 font-mono whitespace-nowrap self-center">
+                               {new Date(task.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                             </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+              </div>
            </div>
 
-           {/* This widget now receives the correctly typed, flattened contact data */}
-           <ContactListWidget contacts={data.activeContacts} />
-        </div>
-
-        {/* LEFT COLUMN (Main Feed) */}
-        <div className="lg:col-span-8 lg:col-start-1 lg:row-start-1 space-y-6">
-          
-          {/* SMART ALERTS (Replaces Dropdown, displayed inline) */}
-          {data.alerts.length > 0 && (
-             <div className="bg-base-100 rounded-2xl border border-base-200 shadow-sm overflow-hidden">
-                <div className="px-4 py-2 bg-base-200/30 border-b border-base-200 flex justify-between items-center">
-                  <h3 className="font-bold text-xs uppercase tracking-widest text-base-content/60 flex items-center gap-2">
-                    <BellAlertIcon className="w-4 h-4" /> Morning Briefing
-                  </h3>
-                  <span className="badge badge-sm badge-neutral">{data.alerts.length}</span>
-                </div>
-                <div className="divide-y divide-base-100">
-                  {data.alerts.map((alert) => (
-                    <Link href={alert.link} key={alert.id} className="flex items-center gap-4 p-4 hover:bg-base-50 transition-colors group">
-                       <div className={`p-2 rounded-xl shrink-0 ${
-                         alert.type === 'CRITICAL' ? 'bg-error/10 text-error' :
-                         alert.type === 'WARNING' ? 'bg-warning/10 text-warning' :
-                         alert.type === 'INFO' ? 'bg-info/10 text-info' :
-                         'bg-success/10 text-success'
-                       }`}>
-                         <alert.icon className="w-5 h-5" />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                          <div className="font-bold text-sm text-base-content group-hover:text-primary transition-colors truncate">
-                            {alert.message}
-                          </div>
-                          <p className="text-xs text-base-content/60 truncate">{alert.subtext}</p>
-                       </div>
-                       <ChevronRightIcon className="w-5 h-5 text-base-content/20 group-hover:text-primary self-center transition-colors" />
-                    </Link>
-                  ))}
-                </div>
-             </div>
-          )}
-
-          {/* TASKS */}
-          <div>
-             <div className="flex justify-between items-center px-1 mb-2">
-               <h3 className="font-bold text-sm text-base-content/70">Upcoming Tasks</h3>
-               <Link href="/tasks" className="text-xs link link-hover opacity-50">View All</Link>
-             </div>
-             <div className="space-y-2">
-               {data.urgentTasks?.length === 0 ? (
-                 <div className="text-center py-8 border border-dashed border-base-300 rounded-xl text-xs opacity-50">No pending tasks</div>
-               ) : (
-                 data.urgentTasks?.map(task => <TaskCard key={task.id} task={task} />)
-               )}
-             </div>
-          </div>
-
-          {/* ACTIVITY FEED */}
-          <div>
-             <h3 className="font-bold text-sm text-base-content/70 px-1 mb-2">Recent Activity</h3>
-             <div className="bg-base-100 rounded-xl border border-base-200 shadow-sm divide-y divide-base-100">
-                {data.activities.length === 0 && <div className="p-6 text-center text-xs opacity-50">No recent activity</div>}
-                {data.activities.map((activity, i) => {
-                   const isNote = activity.type === 'NOTE';
-                   const noteData = isNote ? activity.data as any : null;
-                   const expData = !isNote ? activity.data as any : null;
-                   const linkHref = activity.deal ? `/deals/${activity.deal.id}` : (isNote && noteData.contact ? `/contacts/${noteData.contact.id}` : '#');
+           {/* Activity Feed (Interactive) */}
+           <div className="bg-base-100 rounded-xl border border-base-200 p-4">
+              <h4 className="text-xs font-bold uppercase opacity-40 mb-3">Recent Activity</h4>
+              <div className="space-y-1">
+                 {lists.recentActivity.map(note => {
+                   // Link Logic
+                   let href = "#";
+                   let context = "";
+                   if (note.deal) {
+                     href = `/deals/${note.deal.id}?tab=notes`;
+                     context = note.deal.title;
+                   } else if (note.contact) {
+                     href = `/contacts/${note.contact.id}`;
+                     context = note.contact.name;
+                   }
 
                    return (
-                     <Link key={i} href={linkHref} className={`p-3 flex gap-3 items-start hover:bg-base-50 transition-colors`}>
-                        <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${isNote ? 'bg-primary' : 'bg-error'}`}></div>
-                        <div className="flex-1 min-w-0">
-                           <p className="text-sm line-clamp-2">{isNote ? noteData.content : `Expense: ${expData.description} (-$${expData.amount})`}</p>
-                           <div className="text-[10px] opacity-40 mt-1 flex gap-2">
-                              <span>{new Date(activity.date).toLocaleDateString()}</span>
-                              {activity.deal && <span>• {activity.deal.title}</span>}
-                           </div>
+                     <Link href={href} key={note.id} className="flex gap-3 text-xs hover:bg-base-50 p-2 -mx-2 rounded-lg transition-colors group">
+                        <div className="w-1.5 h-1.5 rounded-full bg-base-300 mt-1.5 shrink-0 group-hover:bg-primary transition-colors"></div>
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-base-content/80 group-hover:text-base-content">{note.content}</p>
+                          <div className="text-[10px] opacity-40 mt-1 flex gap-1 items-center">
+                             <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                             {context && (
+                               <>
+                                 <span>•</span>
+                                 <span className="truncate max-w-[150px] font-medium">{context}</span>
+                               </>
+                             )}
+                          </div>
                         </div>
                      </Link>
-                   )
-                })}
-             </div>
-          </div>
+                   );
+                 })}
+                 {lists.recentActivity.length === 0 && <p className="text-xs opacity-40 italic">No recent notes.</p>}
+              </div>
+           </div>
 
-           {data.staleDeals.length > 0 && (
-             <div className="bg-base-100 rounded-xl border border-warning/30 shadow-sm p-4">
-                <h3 className="text-xs font-bold text-warning uppercase flex items-center gap-2 mb-3">
-                   <ClockIcon className="w-4 h-4" /> Needs Attention
-                </h3>
-                <div className="space-y-2">
-                  {data.staleDeals.map(deal => (
-                     <Link href={`/deals/${deal.id}`} key={deal.id} className="block p-2 bg-base-200/50 rounded-lg hover:bg-base-200 transition-colors">
-                        <div className="font-bold text-sm truncate">{deal.title}</div>
-                        <div className="text-[10px] opacity-50">Last update: {new Date(deal.updatedAt).toLocaleDateString()}</div>
-                     </Link>
-                  ))}
-                </div>
-             </div>
-           )}
         </div>
-
       </div>
     </div>
   );

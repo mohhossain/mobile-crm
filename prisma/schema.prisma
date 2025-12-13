@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // or sqlite/mysql
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -12,57 +12,46 @@ model User {
   clerkId            String    @unique
   name               String
   email              String    @unique
-  googleAccessToken  String?
-  googleRefreshToken String?
   
-  // NEW: Public Profile Fields
+  // Profile
   username           String?   @unique
   bio                String?
   website            String?
   avatar             String?
   isProfileLive      Boolean   @default(false)
   
-  gigs               Gig[]
+  // Settings
+  pipelinePresets    Json?     // Stores custom Kanban columns
+
+  // Relations
   contacts           Contact[]
   companies          Company[]
   products           Product[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @default(now()) @updatedAt
   Task               Task[]
   deals              Deal[]
-  services           Service[]
   notes              Note[]
   meetings           Meeting[]
   expenses           Expense[]
-  invoices           Invoice[] // Added missing relation
-}
-
-model Gig {
-  id          String    @id @default(uuid())
-  name        String
-  userId      String
-  user        User      @relation(fields: [userId], references: [id])
-  contacts    Contact[] @relation("GigContacts")
-  deals       Deal[]
-  createdAt   DateTime  @default(now())
-  Task        Task[]
-  updatedAt   DateTime  @updatedAt
-  description String?
-  services    Service[] @relation("GigServices")
+  invoices           Invoice[]
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+  googleAccessToken  String?
+  googleRefreshToken String?
 }
 
 model Company {
   id        String    @id @default(uuid())
   name      String
-  website   String?
-  logo      String?
-  domain    String?
   userId    String
   user      User      @relation(fields: [userId], references: [id])
   contacts  Contact[]
   deals     Deal[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  website   String?
+  logo      String?
+  domain    String?
 }
 
 model Contact {
@@ -85,7 +74,6 @@ model Contact {
   tasks           Task[]    @relation("_ContactToTask")
   notes           Note[]
   meetings        Meeting[]
-  gigs            Gig[]     @relation("GigContacts")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
 }
@@ -115,29 +103,27 @@ model DealLineItem {
   product     Product? @relation(fields: [productId], references: [id])
 }
 
-
 model Deal {
   id            String        @id @default(uuid())
   title         String
   amount        Float
-  status        DealStatus
-  probability   Int           @default(50)
-  paymentTerms  String?       @default("Net 30")
   
-  shareToken    String?       @unique @default(uuid())
-  portalViews   Int           @default(0)
+  // Financial Status (Simplified)
+  status        DealStatus    @default(OPEN)
   
-  gigId         String?
-  gig           Gig?          @relation(fields: [gigId], references: [id])
+  // Visual Stage (The source of truth for the Kanban)
+  stage         String        @default("Lead")
+  
+  probability   Int           @default(20)
+  
+  roadmap       Json?         // Job Sheet stages
+  
   userId        String
   user          User          @relation(fields: [userId], references: [id])
   contacts      Contact[]     @relation("ContactDeals")
-  companyId     String?
-  company       Company?      @relation(fields: [companyId], references: [id])
-
+  
   lineItems     DealLineItem[]
   invoices      Invoice[]
-  
   tags          Tag[]         @relation("TagDeals")
   tasks         Task[]
   notes         Note[]
@@ -147,8 +133,13 @@ model Deal {
   closeDate     DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
+  paymentTerms  String?       @default("Net 30")
+  shareToken    String?       @unique @default(uuid())
+  portalViews   Int           @default(0)
+  
+  companyId     String?
+  company       Company?      @relation(fields: [companyId], references: [id])
 }
-
 
 model Invoice {
   id          String        @id @default(uuid())
@@ -157,33 +148,16 @@ model Invoice {
   issueDate   DateTime      @default(now())
   dueDate     DateTime
   amount      Float
-  
   dealId      String
-  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade) // Moved cascade here
-  
+  deal        Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
   userId      String
   user        User          @relation(fields: [userId], references: [id])
-  
   items       Json
-  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
   stripeSessionId String?
   paymentLink     String?
   paidAt          DateTime?
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-}
-
-model Service {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  gigs        Gig[]    @relation("GigServices")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
 }
 
 model Note {
@@ -218,17 +192,16 @@ model Task {
   startDate   DateTime?
   dueDate     DateTime?
   status      TaskStatus @default(TO_DO)
-  isPublic    Boolean    @default(false)
+  stage       String?    
   userId      String
   user        User       @relation(fields: [userId], references: [id])
   contacts    Contact[]  @relation("_ContactToTask")
-  gigId       String?
-  gig         Gig?       @relation(fields: [gigId], references: [id])
   dealId      String?
   deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   notes       Note[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+  isPublic    Boolean    @default(false)
 }
 
 model Meeting {
@@ -269,13 +242,10 @@ enum TaskStatus {
 }
 
 enum DealStatus {
+  OPEN
   WON
   LOST
-  CANCELLED
-  NEGOTIATION
-  NEW
-  QUALIFIED
-  PROPOSAL
+  ARCHIVED
 }
 
 enum LeadStatus {
