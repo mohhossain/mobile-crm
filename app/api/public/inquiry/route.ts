@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       data: {
         title: dealTitle,
         amount: dealAmount,
-        status: "NEW", // Default to first stage
+        status: "OPEN", // Default to first stage
         probability: 20, // Low probability for raw inbound leads
         userId: owner.id,
         contacts: {
