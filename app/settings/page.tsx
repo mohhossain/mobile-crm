@@ -2,7 +2,14 @@ import BackButton from "@/app/components/BackButton";
 import { getCurrentUser } from "@/lib/currentUser";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, TagIcon, UserCircleIcon } from "@heroicons/react/24/solid";
+import { 
+  CheckCircleIcon, 
+  XCircleIcon, 
+  TagIcon, 
+  UserCircleIcon,
+  BanknotesIcon,
+  DocumentTextIcon
+} from "@heroicons/react/24/solid";
 import ThemeSelector from "@/app/components/ThemeSelector";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ success?: string, error?: string }> }) {
@@ -11,24 +18,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
   const { success, error } = await searchParams;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { googleRefreshToken: true }
-  });
-
-  const isGoogleConnected = !!dbUser?.googleRefreshToken;
-  const isGoogleConfigured = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
-
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-24">
       <BackButton />
       <h1 className="text-2xl font-bold mt-8">Settings</h1>
 
-      {/* Notifications */}
       {success && (
         <div role="alert" className="alert alert-success">
           <CheckCircleIcon className="w-6 h-6" />
-          <span>Integration successful!</span>
+          <span>Settings saved!</span>
         </div>
       )}
       {error && (
@@ -38,31 +36,52 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {/* 1. BUSINESS SETTINGS */}
+      {/* 1. BUSINESS */}
       <div className="card bg-base-100 shadow border border-base-200">
         <div className="card-body">
            <h2 className="card-title text-lg">Business</h2>
            <div className="flex flex-col gap-2">
-              {/* NEW: Public Profile Link */}
               <Link href="/settings/profile" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
                  <div className="p-2 bg-secondary/10 text-secondary rounded-lg">
                    <UserCircleIcon className="w-5 h-5" />
                  </div>
                  <div className="flex-1">
                    <div className="font-bold text-sm">Public Profile</div>
-                   <div className="text-xs text-base-content/50">Customize your link-in-bio page</div>
+                   <div className="text-xs text-base-content/50">Link-in-bio page</div>
                  </div>
                  <div className="text-xs font-bold text-primary">Manage</div>
               </Link>
 
-              {/* Product Catalog Link */}
               <Link href="/settings/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
                  <div className="p-2 bg-primary/10 text-primary rounded-lg">
                    <TagIcon className="w-5 h-5" />
                  </div>
                  <div className="flex-1">
                    <div className="font-bold text-sm">Products & Services</div>
-                   <div className="text-xs text-base-content/50">Manage your catalog and pricing</div>
+                   <div className="text-xs text-base-content/50">Catalog & Pricing</div>
+                 </div>
+                 <div className="text-xs font-bold text-primary">Manage</div>
+              </Link>
+
+              {/* NEW CONTRACTS LINK */}
+              <Link href="/settings/contract" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
+                 <div className="p-2 bg-accent/10 text-accent rounded-lg">
+                   <DocumentTextIcon className="w-5 h-5" />
+                 </div>
+                 <div className="flex-1">
+                   <div className="font-bold text-sm">Contract Terms</div>
+                   <div className="text-xs text-base-content/50">Default legal agreement</div>
+                 </div>
+                 <div className="text-xs font-bold text-primary">Manage</div>
+              </Link>
+
+              <Link href="/settings/payments" className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors">
+                 <div className="p-2 bg-success/10 text-success rounded-lg">
+                   <BanknotesIcon className="w-5 h-5" />
+                 </div>
+                 <div className="flex-1">
+                   <div className="font-bold text-sm">Payment Methods</div>
+                   <div className="text-xs text-base-content/50">Configure links & bank details</div>
                  </div>
                  <div className="text-xs font-bold text-primary">Manage</div>
               </Link>
@@ -70,49 +89,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
       </div>
 
-      {/* 2. APPEARANCE SETTINGS */}
+      {/* 2. APPEARANCE */}
       <div className="card bg-base-100 shadow border border-base-200">
         <div className="card-body">
            <h2 className="card-title text-lg">Appearance</h2>
-           <p className="text-gray-500 text-sm mb-4">Choose your preferred color theme.</p>
            <ThemeSelector />
-        </div>
-      </div>
-
-      {/* 3. INTEGRATIONS */}
-      <div className="card bg-base-100 shadow border border-base-200">
-        <div className="card-body">
-          <h2 className="card-title text-lg">Integrations</h2>
-          <p className="text-gray-500 text-sm">
-            Connect external services to sync data.
-          </p>
-          
-          <div className="flex flex-col gap-3 mt-4">
-            {/* Google Integration */}
-            <div className={`flex items-center justify-between p-3 border rounded-lg ${isGoogleConnected ? 'bg-green-50/50 border-green-200' : 'bg-base-50'}`}>
-              <div className="flex items-center gap-3">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" alt="Google" className="w-8 h-8" />
-                <div>
-                  <div className="font-bold text-sm">Google Calendar</div>
-                  <div className="text-xs text-gray-500">
-                    {isGoogleConnected ? "Connected" : "Sync meetings & tasks"}
-                  </div>
-                </div>
-              </div>
-              
-              {isGoogleConnected ? (
-                 <button className="btn btn-sm btn-outline btn-success" disabled>Connected</button>
-              ) : isGoogleConfigured ? (
-                <Link href="/api/google/auth" prefetch={false}>
-                  <button className="btn btn-sm btn-primary">Connect</button>
-                </Link>
-              ) : (
-                <div className="badge badge-warning gap-1 text-xs" title="Missing API Keys in Vercel">
-                  <ExclamationTriangleIcon className="w-3 h-3" /> Config Required
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
       

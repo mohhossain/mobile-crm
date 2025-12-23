@@ -43,28 +43,51 @@ export async function PUT(
 
   const { id } = await params
   const body = await request.json()
-  const { title, amount, status, stage, closeDate, contactIds, probability, roadmap } = body
+  
+  const { 
+    title, 
+    amount, 
+    status, 
+    stage, 
+    closeDate, 
+    contactIds, 
+    probability, 
+    roadmap,
+    depositAmount,       
+    paymentLink,         
+    paymentInstructions, 
+    paymentMethods,      
+    shareToken           
+  } = body
 
   try {
+    const updateData: any = {};
+
+    if (title !== undefined) updateData.title = title;
+    if (amount !== undefined) updateData.amount = parseFloat(amount);
+    if (status !== undefined) updateData.status = status;
+    if (stage !== undefined) updateData.stage = stage;
+    if (probability !== undefined) updateData.probability = probability;
+    if (closeDate !== undefined) updateData.closeDate = toSafeDate(closeDate);
+    if (roadmap !== undefined) updateData.roadmap = roadmap;
+    
+    if (depositAmount !== undefined) updateData.depositAmount = parseFloat(depositAmount);
+    if (paymentLink !== undefined) updateData.paymentLink = paymentLink;
+    if (paymentInstructions !== undefined) updateData.paymentInstructions = paymentInstructions;
+    if (paymentMethods !== undefined) updateData.paymentMethods = paymentMethods;
+    if (shareToken !== undefined) updateData.shareToken = shareToken;
+
+    if (contactIds !== undefined) {
+      updateData.contacts = {
+        set: [], 
+        connect: contactIds.map((cid: string) => ({ id: cid }))
+      };
+    }
+
     const updatedDeal = await prisma.deal.update({
       where: { id, userId: user.id },
-      data: {
-        ...(title && { title }),
-        ...(amount !== undefined && { amount: parseFloat(amount) }),
-        ...(status && { status }),
-        ...(stage && { stage }), // NEW: Update Visual Stage independently
-        ...(probability !== undefined && { probability }),
-        ...(closeDate !== undefined && { closeDate: toSafeDate(closeDate) }),
-        ...(roadmap && { roadmap }),
-        
-        ...(contactIds && {
-          contacts: {
-            set: [], 
-            connect: contactIds.map((cid: string) => ({ id: cid }))
-          }
-        })
-      },
-      include: { contacts: true, expenses: true, tasks: true, notes: true, invoices: true }
+      data: updateData,
+      include: { contacts: true, expenses: true, tasks: true, notes: true, invoices: true, lineItems: true }
     })
 
     return NextResponse.json({ success: true, deal: updatedDeal })

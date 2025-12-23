@@ -8,7 +8,7 @@ import {
   ClipboardDocumentListIcon, 
   BanknotesIcon,
   UserPlusIcon,
-  XMarkIcon
+  BriefcaseIcon
 } from "@heroicons/react/24/outline";
 
 // Import standalone forms as requested
@@ -50,9 +50,9 @@ export default function HomeActions() {
         {/* Trigger Button */}
         <button 
           onClick={() => setIsOpen(!isOpen)} 
-          className="btn btn-primary gap-2 shadow-lg hover:scale-105 transition-transform"
+          className="btn btn-primary btn-sm gap-2 shadow-lg shadow-primary/20 rounded-full px-4"
         >
-          <PlusIcon className="w-5 h-5" />
+          <PlusIcon className="w-4 h-4" />
           <span className="hidden sm:inline">Create</span>
           <span className="sm:hidden">Add</span>
         </button>
@@ -71,7 +71,7 @@ export default function HomeActions() {
                   
                   <button onClick={() => openModal('DEAL')} className="btn btn-ghost justify-start gap-3 h-auto py-3 group">
                     <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                      <CurrencyDollarIcon className="w-5 h-5" />
+                      <BriefcaseIcon className="w-5 h-5" />
                     </div>
                     <div className="text-left">
                       <div className="font-bold text-sm">New Deal</div>
@@ -119,13 +119,12 @@ export default function HomeActions() {
 
       {/* --- MODALS --- */}
       
-      {/* Deal Modal */}
+      {/* Add Deal Modal */}
       {activeModal === 'DEAL' && (
-        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[60]">
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-50">
           <div className="modal-box p-0 bg-transparent shadow-none overflow-visible max-w-3xl w-full">
              <div className="bg-base-100 rounded-2xl overflow-hidden h-[85vh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl relative">
-                {/* Header for mobile spacing */}
-                <div className="p-4 border-b border-base-200 flex justify-between items-center bg-base-100 sticky top-0 z-10">
+                <div className="p-4 border-b border-base-200 flex justify-between items-center shrink-0 bg-base-100 z-10">
                    <h3 className="font-bold text-lg">New Deal</h3>
                    <button onClick={closeModal} className="btn btn-sm btn-circle btn-ghost">✕</button>
                 </div>
@@ -138,12 +137,12 @@ export default function HomeActions() {
         </dialog>
       )}
 
-      {/* Task Modal */}
+      {/* Add Task Modal */}
       {activeModal === 'TASK' && (
-        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[60]">
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-50">
            <div className="modal-box p-6 bg-base-100">
               <button onClick={closeModal} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-              <div className="mt-2">
+              <div className="mt-4">
                  <AddTasks />
               </div>
            </div>
@@ -151,9 +150,9 @@ export default function HomeActions() {
         </dialog>
       )}
 
-      {/* Contact Modal */}
+      {/* Add Contact Modal */}
       {activeModal === 'CONTACT' && (
-        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[60]">
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-50">
            <div className="modal-box p-6 bg-base-100">
               <h3 className="font-bold text-lg mb-4">New Contact</h3>
               <button onClick={closeModal} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
@@ -163,9 +162,9 @@ export default function HomeActions() {
         </dialog>
       )}
 
-      {/* Expense Modal */}
+      {/* Add Expense Modal */}
       {activeModal === 'EXPENSE' && (
-        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[60]">
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-50">
            <div className="modal-box p-6 bg-base-100">
               <h3 className="font-bold text-lg mb-4">Log Expense</h3>
               <button onClick={closeModal} className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,7 +20,13 @@ model User {
   isProfileLive      Boolean   @default(false)
   
   // Settings
-  pipelinePresets    Json?     // Stores custom Kanban columns
+  pipelinePresets    Json?     
+  terms              String?   
+  
+  // PAYMENT SETTINGS
+  defaultPaymentLink String?   
+  paymentInstructions String?
+  paymentMethods      Json?   
 
   // Relations
   contacts           Contact[]
@@ -97,6 +102,7 @@ model DealLineItem {
   quantity    Int      @default(1)
   price       Float
   name        String
+  description String?  // Added description to schema
   dealId      String
   deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   productId   String?
@@ -107,21 +113,25 @@ model Deal {
   id            String        @id @default(uuid())
   title         String
   amount        Float
-  
-  // Financial Status (Simplified)
   status        DealStatus    @default(OPEN)
-  
-  // Visual Stage (The source of truth for the Kanban)
   stage         String        @default("Lead")
-  
   probability   Int           @default(20)
+  roadmap       Json?         
   
-  roadmap       Json?         // Job Sheet stages
+  depositAmount Float?        @default(0)
+  signature     String?       
+  signedAt      DateTime?
   
+
+    // PAYMENT OVERRIDES (Specific to this deal)
+  paymentLink         String?       
+  paymentInstructions String?  // <--- ADDED: Fixes "Unknown argument" error
+  paymentMethods      Json?    // <--- ADDED: Fixes "Unknown argument" error
+
+
   userId        String
   user          User          @relation(fields: [userId], references: [id])
   contacts      Contact[]     @relation("ContactDeals")
-  
   lineItems     DealLineItem[]
   invoices      Invoice[]
   tags          Tag[]         @relation("TagDeals")
@@ -136,7 +146,6 @@ model Deal {
   paymentTerms  String?       @default("Net 30")
   shareToken    String?       @unique @default(uuid())
   portalViews   Int           @default(0)
-  
   companyId     String?
   company       Company?      @relation(fields: [companyId], references: [id])
 }
@@ -155,9 +164,9 @@ model Invoice {
   items       Json
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  stripeSessionId String?
-  paymentLink     String?
-  paidAt          DateTime?
+  
+  paymentLink         String?
+  paidAt              DateTime?
 }
 
 model Note {

@@ -7,7 +7,7 @@ import {
   TrashIcon, 
   ClockIcon, 
   PencilSquareIcon, 
-  XMarkIcon,
+  XMarkIcon, 
   CheckIcon,
   CalendarDaysIcon,
   ArrowDownTrayIcon,
@@ -38,14 +38,25 @@ export default function TaskCard({ task }: TaskProps) {
   
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || "");
+  
+  // FIX: Initialize using Local Time components so the input matches what the user sees
   const [editDate, setEditDate] = useState(() => {
     if (!task.dueDate) return "";
-    return new Date(task.dueDate).toISOString().split('T')[0];
+    const d = new Date(task.dueDate);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
+
   const [editTime, setEditTime] = useState(() => {
     if (!task.dueDate) return "";
-    return new Date(task.dueDate).toISOString().split('T')[1].substring(0, 5);
+    const d = new Date(task.dueDate);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${mins}`;
   });
+
   const [editPriority, setEditPriority] = useState(task.priority);
 
   const router = useRouter();
@@ -165,7 +176,10 @@ END:VCALENDAR`;
       let finalDate = null;
       if (editDate) {
         const timePart = editTime || "00:00"; 
-        finalDate = `${editDate}T${timePart}:00.000Z`;
+        // FIX: Combine as Local Time string first, then convert to ISO (UTC)
+        // This ensures "2023-12-14 19:00" Local stays "2023-12-14 19:00" Local
+        const localDate = new Date(`${editDate}T${timePart}`);
+        finalDate = localDate.toISOString();
       }
 
       const res = await fetch(`/api/tasks/${task.id}`, {
@@ -228,13 +242,40 @@ END:VCALENDAR`;
           <div className="flex-1 min-w-0">
              {isEditing ? (
                <div className="flex flex-col gap-2">
-                 <input className="input input-sm input-bordered w-full font-bold" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                 <textarea className="textarea textarea-sm textarea-bordered w-full" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} />
+                 <input 
+                   className="input input-sm input-bordered w-full font-bold" 
+                   value={editTitle}
+                   onChange={(e) => setEditTitle(e.target.value)}
+                   placeholder="Task Title"
+                 />
+                 <textarea 
+                   className="textarea textarea-sm textarea-bordered w-full" 
+                   value={editDesc}
+                   onChange={(e) => setEditDesc(e.target.value)}
+                   placeholder="Description..."
+                   rows={2}
+                 />
                  <div className="flex flex-wrap gap-2">
-                   <input type="date" className="input input-sm input-bordered flex-grow min-w-[120px]" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
-                   <input type="time" className="input input-sm input-bordered w-24" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
-                   <select className="select select-sm select-bordered w-full sm:w-auto" value={editPriority} onChange={(e) => setEditPriority(Number(e.target.value))}>
-                     <option value={1}>Low</option><option value={2}>Medium</option><option value={3}>High</option>
+                   <input 
+                     type="date" 
+                     className="input input-sm input-bordered flex-grow min-w-[120px]"
+                     value={editDate}
+                     onChange={(e) => setEditDate(e.target.value)}
+                   />
+                   <input 
+                     type="time" 
+                     className="input input-sm input-bordered w-24"
+                     value={editTime}
+                     onChange={(e) => setEditTime(e.target.value)}
+                   />
+                   <select 
+                     className="select select-sm select-bordered w-full sm:w-auto"
+                     value={editPriority}
+                     onChange={(e) => setEditPriority(Number(e.target.value))}
+                   >
+                     <option value={1}>Low Priority</option>
+                     <option value={2}>Medium Priority</option>
+                     <option value={3}>High Priority</option>
                    </select>
                  </div>
                  <div className="flex gap-2 justify-end mt-2">
@@ -244,18 +285,31 @@ END:VCALENDAR`;
                </div>
              ) : (
                <>
-                 <h3 className={`font-semibold truncate transition-all ${task.status === 'DONE' ? 'line-through decoration-2 text-gray-400' : ''}`}>{task.title}</h3>
-                 {task.description && <p className={`text-sm mt-1 line-clamp-2 ${task.status === 'DONE' ? 'text-gray-300' : 'text-gray-500'}`}>{task.description}</p>}
+                 <h3 className={`font-semibold truncate transition-all ${
+                   task.status === 'DONE' ? 'line-through decoration-2 text-gray-400' : ''
+                 }`}>
+                   {task.title}
+                 </h3>
+                 
+                 {task.description && (
+                   <p className={`text-sm mt-1 line-clamp-2 ${task.status === 'DONE' ? 'text-gray-300' : 'text-gray-500'}`}>
+                     {task.description}
+                   </p>
+                 )}
                  
                  <div className="flex flex-wrap gap-2 mt-2 items-center">
                    {task.dueDate && (
                      <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-error font-bold' : 'text-gray-400'}`}>
                        <ClockIcon className="w-3 h-3" />
                        {new Date(task.dueDate).toLocaleDateString()} 
-                       <span className="opacity-50">{new Date(task.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                       <span className="opacity-50">
+                         {new Date(task.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                       </span>
                      </span>
                    )}
-                   {task.deal && <span className="badge badge-xs badge-ghost">Deal: {task.deal.title}</span>}
+                   {task.deal && (
+                     <span className="badge badge-xs badge-ghost">Deal: {task.deal.title}</span>
+                   )}
                  </div>
                </>
              )}
