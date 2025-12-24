@@ -9,24 +9,17 @@ const toSafeDate = (dateStr: any): Date | null => {
   return date;
 };
 
-// Default Job Sheet Stages
-const DEFAULT_ROADMAP = [
-  { id: "stage-1", title: "Prep", status: "ACTIVE" },
-  { id: "stage-2", title: "The Work", status: "PENDING" },
-  { id: "stage-3", title: "Wrap Up", "status": "PENDING" }
-];
-
+// GET Method (Existing code...)
 export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     try {
         const deals = await prisma.deal.findMany({
             where: { userId: user.id },
             include: {
                 tags: true,
                 contacts: true,
-                lineItems: true,
+                lineItems: true, // Ensure we fetch items
                 notes: { include: { user: true } },
                 expenses: true,
             },
@@ -38,6 +31,8 @@ export async function GET() {
     }
 }
 
+// POST Method (THE FIX)
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,8 +43,12 @@ export async function POST(request: Request) {
   const safeTags = Array.isArray(tags) ? tags : [];
   const safeContactIds = Array.isArray(contactIds) ? contactIds : [];
   const safeNotes = Array.isArray(notes) ? notes.filter((n: any) => typeof n === "string" && n.trim() !== "") : [];
-  const safeExpenses = Array.isArray(expenses) ? expenses : [];
-  const safeLineItems = Array.isArray(lineItems) ? lineItems : [];
+  
+  // FIX: Filter out empty items
+  const safeLineItems = Array.isArray(lineItems) 
+    ? lineItems.filter((i: any) => i.name && i.name.trim() !== "") 
+    : [];
+
   const parsedAmount = typeof amount === "number" && !isNaN(amount) ? amount : 0;
 
   try {
@@ -57,13 +56,13 @@ export async function POST(request: Request) {
       data: {
         title,
         amount: parsedAmount,
-        status: "OPEN", // Always start OPEN
-        stage: "Lead",  // Always start in Lead column
+        status: "OPEN",
+        stage: "Lead",
         probability: 20,
         userId: user.id,
         closeDate: toSafeDate(closeDate),
-        roadmap: DEFAULT_ROADMAP,
         
+        // Tags
         tags: safeTags.length > 0 ? {
           connectOrCreate: safeTags.map((tag: string) => ({
             where: { name: tag },
@@ -71,10 +70,12 @@ export async function POST(request: Request) {
           })),
         } : undefined,
         
+        // Contacts
         contacts: safeContactIds.length > 0 ? {
           connect: safeContactIds.map((id: string) => ({ id })),
         } : undefined,
         
+        // Notes
         notes: safeNotes.length > 0 ? {
           create: safeNotes.map((note: string) => ({
             content: note,
@@ -82,8 +83,9 @@ export async function POST(request: Request) {
           })),
         } : undefined,
 
-        expenses: safeExpenses.length > 0 ? {
-          create: safeExpenses.map((exp: any) => ({
+        // Expenses
+        expenses: Array.isArray(expenses) && expenses.length > 0 ? {
+          create: expenses.map((exp: any) => ({
             description: exp.description,
             amount: parseFloat(exp.amount),
             category: exp.category || "OTHER",
@@ -92,17 +94,20 @@ export async function POST(request: Request) {
           }))
         } : undefined,
 
+        // FIX: Explicitly map line items. 
+        // If productId exists, we simply set the scalar field `productId` (which is cleaner than using connect)
         lineItems: safeLineItems.length > 0 ? {
           create: safeLineItems.map((item: any) => ({
             name: item.name,
-            quantity: Number(item.quantity),
-            price: Number(item.price),
-            productId: item.productId || null
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+            description: item.description || "",
+            // This is the critical fix for linking:
+            productId: (item.productId && typeof item.productId === 'string') ? item.productId : null
           }))
         } : undefined
       },
     });
-
     return NextResponse.json(deal);
   } catch (err) {
     console.error("Error creating deal:", err);

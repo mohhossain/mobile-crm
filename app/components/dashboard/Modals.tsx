@@ -8,6 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AddExpense from "../AddExpense";
 import PaymentConfigModal from "./PaymentConfigModal"; // Import the new modal
+import ContractPDF from "../portal/ContractPDF";
 
 interface ModalsProps {
   deal: any;
@@ -161,6 +162,17 @@ export default function Modals({
               </div>
            </div>
            <div className="modal-backdrop" onClick={() => setShowContract(false)}></div>
+        </dialog>
+      )}
+
+      {showContract && deal.signature && (
+        <dialog open className="modal modal-bottom sm:modal-middle bg-black/60 backdrop-blur-sm z-[70]">
+           {/* Render ContractPDF directly - it handles the full screen overlay style */}
+           <ContractPDF 
+              deal={deal} 
+              user={user} 
+              onClose={() => setShowContract(false)} 
+           />
         </dialog>
       )}
 

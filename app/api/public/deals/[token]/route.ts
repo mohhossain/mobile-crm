@@ -5,7 +5,6 @@ export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ token: string }> }
 ) {
-  // Fix: Await params because it is a Promise in this environment
   const { token } = await params;
 
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
@@ -16,6 +15,8 @@ export async function GET(
       include: {
         lineItems: true,
         company: true,
+        // FIX: This was missing! We must fetch contacts to display "Emily Chen"
+        contacts: true, 
         user: {
           select: {
             name: true,
@@ -29,7 +30,7 @@ export async function GET(
           }
         },
         invoices: {
-            orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' }
         }
       }
     });

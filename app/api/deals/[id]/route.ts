@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getCurrentUser } from '@/lib/currentUser'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/currentUser';
 
 const toSafeDate = (dateStr: any): Date | null => {
   if (!dateStr) return null;
@@ -13,9 +13,9 @@ export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id } = await params
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id } = await params;
   
   const deal = await prisma.deal.findUnique({
     where: { id, userId: user.id },
@@ -28,41 +28,35 @@ export async function GET(
       lineItems: true,
       invoices: { orderBy: { createdAt: 'desc' } }
     }
-  })
+  });
+
+  // --- DEBUG LOG ---
+  console.log(`[API GET] Deal: ${id}`);
+  console.log(`[API GET] Line Items Found: ${deal?.lineItems?.length || 0}`);
+  // -----------------
   
-  if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(deal)
+  if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  return NextResponse.json(deal);
 }
 
 export async function PUT(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { id } = await params
-  const body = await request.json()
+  const { id } = await params;
+  const body = await request.json();
   
   const { 
-    title, 
-    amount, 
-    status, 
-    stage, 
-    closeDate, 
-    contactIds, 
-    probability, 
-    roadmap,
-    depositAmount,       
-    paymentLink,         
-    paymentInstructions, 
-    paymentMethods,      
-    shareToken           
-  } = body
+    title, amount, status, stage, closeDate, contactIds, probability, 
+    roadmap, depositAmount, paymentLink, paymentInstructions, 
+    paymentMethods, shareToken, customTerms // <--- Destructure new field
+  } = body;
 
   try {
     const updateData: any = {};
-
     if (title !== undefined) updateData.title = title;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
     if (status !== undefined) updateData.status = status;
@@ -76,6 +70,9 @@ export async function PUT(
     if (paymentInstructions !== undefined) updateData.paymentInstructions = paymentInstructions;
     if (paymentMethods !== undefined) updateData.paymentMethods = paymentMethods;
     if (shareToken !== undefined) updateData.shareToken = shareToken;
+    
+    // --- NEW UPDATE LOGIC ---
+    if (customTerms !== undefined) updateData.customTerms = customTerms;
 
     if (contactIds !== undefined) {
       updateData.contacts = {
@@ -88,12 +85,12 @@ export async function PUT(
       where: { id, userId: user.id },
       data: updateData,
       include: { contacts: true, expenses: true, tasks: true, notes: true, invoices: true, lineItems: true }
-    })
+    });
 
-    return NextResponse.json({ success: true, deal: updatedDeal })
+    return NextResponse.json({ success: true, deal: updatedDeal });
   } catch (err) {
-    console.error("Update Deal Error:", err)
-    return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 })
+    console.error("Update Deal Error:", err);
+    return NextResponse.json({ error: 'Failed to update deal' }, { status: 500 });
   }
 }
 
@@ -101,14 +98,14 @@ export async function DELETE(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { id } = await params
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id } = await params;
 
   try {
-    await prisma.deal.delete({ where: { id, userId: user.id } })
-    return NextResponse.json({ success: true })
+    await prisma.deal.delete({ where: { id, userId: user.id } });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 });
   }
 }

@@ -2,23 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { 
-  BoltIcon,
-  CheckBadgeIcon,
-  DocumentTextIcon
-} from "@heroicons/react/24/solid";
+import { BoltIcon, CheckBadgeIcon } from "@heroicons/react/24/solid";
 import ProposalView from "@/app/components/portal/ProposalView";
 import ContractSigner from "@/app/components/portal/ContractSigner";
 import PaymentButton from "@/app/components/portal/PaymentButton";
+import DocumentsVault from "@/app/components/portal/DocumentsVault";
 
 export default function ClientPortal() {
   const { token } = useParams();
   const [deal, setDeal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
-  // CHANGED: Default tab is now INVOICE (formerly PROPOSAL)
-  const [activeTab, setActiveTab] = useState<'INVOICE' | 'CONTRACT' | 'PAYMENT'>('INVOICE');
-  
+  const [activeTab, setActiveTab] = useState<'INVOICE' | 'CONTRACT' | 'PAYMENT' | 'DOCS'>('INVOICE');
   const [isSigned, setIsSigned] = useState(false);
 
   useEffect(() => {
@@ -29,16 +23,14 @@ export default function ClientPortal() {
           const data = await res.json();
           setDeal(data);
           
+          // AUTO TRIGGER VIEW
+          await fetch(`/api/public/deals/${token}/view`, { method: 'POST' });
+
           if (data.signedAt) {
              setIsSigned(true);
-             // Even if signed, we might want to stay on Invoice/Payment
-             // But if payment is pending, maybe Payment tab?
-             // User asked to prioritize Invoice view.
-             // We'll stick to INVOICE as default unless user action changes it.
              if (data.status === 'WON' || data.invoices.some((i: any) => i.status === 'PAID')) {
-                // If fully paid/won, stay on invoice/summary
+                setActiveTab('DOCS'); 
              } else {
-                // If signed but not paid, maybe suggest payment
                 setActiveTab('PAYMENT');
              }
           }
@@ -48,14 +40,16 @@ export default function ClientPortal() {
     fetchDeal();
   }, [token]);
 
-  const handleContractSigned = async (signatureData: string) => {
+// Update this function signature to accept 'name'
+  const handleContractSigned = async (signatureData: string, printedName: string) => {
     try {
       const res = await fetch(`/api/public/deals/${token}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signature: signatureData })
+        // PASS BOTH FIELDS
+        body: JSON.stringify({ signature: signatureData, signedName: printedName })
       });
-      
+
       if (res.ok) {
         setIsSigned(true);
         setActiveTab('PAYMENT');
@@ -75,8 +69,6 @@ export default function ClientPortal() {
 
   return (
     <div className="min-h-screen bg-base-200 font-sans pb-32">
-      
-      {/* HEADER */}
       <div className="bg-base-100 border-b border-base-200 sticky top-0 z-20 backdrop-blur-md bg-base-100/80">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
            <div className="flex items-center gap-3">
@@ -97,33 +89,38 @@ export default function ClientPortal() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 mt-8 space-y-8">
-        
-        {/* HERO */}
         <div className="text-center space-y-2">
-           <div className="text-xs font-bold uppercase tracking-widest text-base-content/40">Invoice & Project</div>
+           <div className="text-xs font-bold uppercase tracking-widest text-base-content/40">Client Portal</div>
            <h1 className="text-3xl sm:text-4xl font-black text-base-content leading-tight">{deal.title}</h1>
            <p className="text-base-content/60">Prepared for {deal.company?.name || "Client"}</p>
         </div>
 
-        {/* PROGRESS STEPS */}
-        <ul className="steps w-full text-xs opacity-80">
-          <li className={`step ${activeTab === 'INVOICE' || isSigned ? 'step-primary' : ''}`}>Invoice</li>
-          <li className={`step ${activeTab === 'CONTRACT' || isSigned ? 'step-primary' : ''}`}>Contract</li>
-          <li className={`step ${activeTab === 'PAYMENT' ? 'step-primary' : ''}`}>Pay</li>
-        </ul>
+        <div role="tablist" className="tabs tabs-boxed bg-base-100 p-1 rounded-xl border border-base-200 shadow-sm grid grid-cols-4">
+          {['INVOICE', 'CONTRACT', 'PAYMENT', 'DOCS'].map((tab) => (
+            <a 
+                key={tab}
+                role="tab" 
+                className={`tab h-10 rounded-lg transition-all duration-200 font-medium text-xs sm:text-sm ${activeTab === tab ? 'tab-active bg-primary text-primary-content shadow-sm' : 'hover:bg-base-200 text-base-content/60'}`}
+                onClick={() => setActiveTab(tab as any)}
+            >
+                {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            </a>
+          ))}
+        </div>
 
-        {/* CONTENT AREA */}
         <div className="min-h-[400px]">
-           {/* Reusing ProposalView but conceptually it's the Invoice/Breakdown */}
            {activeTab === 'INVOICE' && <ProposalView deal={deal} onAccept={() => setActiveTab('CONTRACT')} />}
            
            {activeTab === 'CONTRACT' && (
               isSigned ? (
-                 <div className="text-center p-12 bg-base-100 rounded-2xl border border-base-200">
+                 <div className="text-center p-12 bg-base-100 rounded-2xl border border-base-200 animate-in fade-in zoom-in">
                     <CheckBadgeIcon className="w-16 h-16 text-success mx-auto mb-4" />
                     <h3 className="font-bold text-xl">Contract Signed!</h3>
                     <p className="text-sm opacity-60 mb-6">We are ready to move forward.</p>
-                    <button onClick={() => setActiveTab('PAYMENT')} className="btn btn-outline">Go to Payment</button>
+                    <div className="flex gap-2 justify-center">
+                        <button onClick={() => setActiveTab('DOCS')} className="btn btn-ghost">View Docs</button>
+                        <button onClick={() => setActiveTab('PAYMENT')} className="btn btn-outline">Go to Payment</button>
+                    </div>
                  </div>
               ) : (
                  <ContractSigner deal={deal} onSign={handleContractSigned} />
@@ -131,8 +128,8 @@ export default function ClientPortal() {
            )}
 
            {activeTab === 'PAYMENT' && <PaymentButton deal={deal} />}
+           {activeTab === 'DOCS' && <DocumentsVault deal={deal} user={deal.user} />}
         </div>
-
       </div>
     </div>
   );

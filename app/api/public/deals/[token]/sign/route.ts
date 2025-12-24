@@ -3,35 +3,31 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(
   request: NextRequest, 
-  { params }: { params: { token: string } }
+  { params }: { params: Promise<{ token: string }> }
 ) {
-  // Fix: Await params here as well
   const { token } = await params;
-  const { signature } = await request.json();
-
+  
+  // Extract signedName from body
+  const { signature, signedName } = await request.json();
 
   if (!token || !signature) {
-    return NextResponse.json({ error: "Missing data" }, { status: 400 });
+    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
   try {
-    // Verify deal exists first
     const deal = await prisma.deal.findUnique({ where: { shareToken: token } });
     if (!deal) return NextResponse.json({ error: "Deal not found" }, { status: 404 });
 
-    // Update Deal: Signed + Move to 'Negotiation' if it was in 'Proposal'
-    let updateData: any = {
-      signature,
-      signedAt: new Date()
-    };
-
-    if (deal.stage === 'Proposal') {
-      updateData.stage = 'Negotiation'; // Move forward automatically
-    }
-
     const updated = await prisma.deal.update({
       where: { id: deal.id },
-      data: updateData
+      data: {
+        signature,
+        signedName: signedName || "Authorized Client", // Save the printed name
+        signedAt: new Date(),
+        status: 'WON',        
+        stage: 'Won',         
+        probability: 100,     
+      }
     });
 
     return NextResponse.json({ success: true, deal: updated });

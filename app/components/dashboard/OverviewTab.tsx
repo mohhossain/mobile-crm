@@ -3,24 +3,25 @@
 import { useState } from "react";
 import Link from "next/link";
 import { 
-  BanknotesIcon, 
   ArrowTrendingUpIcon, 
   CalendarDaysIcon,
   ExclamationCircleIcon,
   DocumentTextIcon,
-  ClockIcon,
   Cog6ToothIcon,
-  CreditCardIcon
+  CreditCardIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline';
 import LineItemsManager from "./LineItemsManager";
+import ContractEditor from "./ContractEditor";
 
 interface OverviewProps {
   deal: any;
+  user: any; // Make sure this is included
   onUpdate: (updates: any) => void;
   onRefresh: () => void;
-  onOpenPayment: () => void; // Record Payment
+  onOpenPayment: () => void; 
   onOpenExpense: () => void;
-  onOpenPaymentConfig: () => void; // Configure Payment (Deposit/Methods)
+  onOpenPaymentConfig: () => void;
   onViewContract: () => void;
   onSendProposal: () => void;
   onGenerateLink: () => void;
@@ -29,6 +30,7 @@ interface OverviewProps {
 
 export default function OverviewTab({ 
   deal, 
+  user, 
   onUpdate, 
   onRefresh, 
   onOpenPayment, 
@@ -43,13 +45,12 @@ export default function OverviewTab({
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [dateInput, setDateInput] = useState(deal.closeDate ? new Date(deal.closeDate).toISOString().split('T')[0] : "");
 
-  // Calculations
   const totalExpenses = deal.expenses?.reduce((sum: number, e: any) => sum + e.amount, 0) || 0;
   const netProfit = deal.amount - totalExpenses;
   const isDueSoon = deal.closeDate && new Date(deal.closeDate) > new Date() && 
     (new Date(deal.closeDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24) <= 7;
 
-  // Handlers
+    console.log("[OverviewTab] Rendering. Deal Line Items:", deal.lineItems);
   const saveDate = () => {
     const newDate = dateInput ? new Date(`${dateInput}T17:00:00`).toISOString() : null;
     onUpdate({ closeDate: newDate });
@@ -65,20 +66,28 @@ export default function OverviewTab({
           {/* Scope of Work */}
           <LineItemsManager dealId={deal.id} initialItems={deal.lineItems || []} onUpdate={onRefresh} />
           
+          {/* UPDATED: Pass isSigned prop */}
+          <ContractEditor 
+              dealId={deal.id} 
+              initialTerms={deal.customTerms} 
+              defaultTerms={user?.terms || ""} 
+              isSigned={!!deal.signedAt} // <--- Block editing if signed
+              onUpdate={onRefresh} 
+          />
+          
           {/* Financial Summary */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-             {/* Payment Terms (Renamed from Deposit) */}
+             {/* Payment Terms */}
              <div 
                className="bg-base-100 p-4 rounded-xl border border-base-200 shadow-sm cursor-pointer hover:border-primary/50 transition group relative overflow-hidden"
                onClick={onOpenPaymentConfig}
-             >
+              >
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-xs font-bold uppercase opacity-50">
                         <CreditCardIcon className="w-4 h-4" /> Payment Terms
                     </div>
                     <Cog6ToothIcon className="w-4 h-4 opacity-0 group-hover:opacity-30 transition-opacity" />
                 </div>
-                
                 <div className="text-xl font-bold">
                    {deal.depositAmount > 0 ? (
                        <span className="flex flex-col">
@@ -88,8 +97,6 @@ export default function OverviewTab({
                        <span className="text-base font-normal opacity-60">Full on Completion</span>
                    )}
                 </div>
-                
-                {/* Visual Indicator for Configured Methods */}
                 {(deal.paymentLink || (deal.paymentMethods && Object.keys(deal.paymentMethods).length > 0)) && (
                     <div className="absolute bottom-2 right-2 flex gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
@@ -113,16 +120,9 @@ export default function OverviewTab({
                   <CalendarDaysIcon className="w-4 h-4" /> Target Close
                 </div>
                 {isEditingDate ? (
-                  <input 
-                    type="date" 
-                    className="input input-sm w-full p-0 focus:outline-none" 
-                    value={dateInput} 
-                    onChange={e => setDateInput(e.target.value)} 
-                    onBlur={saveDate} 
-                    autoFocus 
-                  />
+                  <input type="date" className="input input-sm w-full p-0 focus:outline-none" value={dateInput} onChange={e => setDateInput(e.target.value)} onBlur={saveDate} autoFocus />
                 ) : (
-                  <div className="text-xl font-bold flex items-center gap-2">
+                   <div className="text-xl font-bold flex items-center gap-2">
                     {deal.closeDate ? new Date(deal.closeDate).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : <span className="text-xs opacity-50">Set Date</span>}
                     {isDueSoon && <span className="badge badge-xs badge-warning">Soon</span>}
                   </div>
@@ -182,7 +182,7 @@ export default function OverviewTab({
 
        {/* RIGHT COLUMN: Action Center */}
        <div className="space-y-6">
-          <div className="card bg-base-100 shadow-sm border border-base-200 h-fit">
+           <div className="card bg-base-100 shadow-sm border border-base-200 h-fit">
              <div className="p-4 border-b border-base-200 bg-base-50/50 rounded-t-xl">
                 <h3 className="font-bold text-sm uppercase opacity-60 flex items-center gap-2">
                   <ExclamationCircleIcon className="w-4 h-4 text-secondary" /> Action Center
@@ -190,10 +190,7 @@ export default function OverviewTab({
              </div>
              <div className="card-body p-4 gap-4">
                 <div className="grid grid-cols-1 gap-2">
-                   <button 
-                     onClick={onOpenPayment}
-                     className="btn btn-sm btn-primary w-full text-xs shadow-md"
-                   >
+                   <button onClick={onOpenPayment} className="btn btn-sm btn-primary w-full text-xs shadow-md">
                      <BanknotesIcon className="w-3 h-3" /> Record Payment
                    </button>
                 </div>
@@ -205,9 +202,8 @@ export default function OverviewTab({
                      <DocumentTextIcon className="w-3 h-3" /> Invoice
                    </Link>
                 </div>
-                {/* Next Up Task */}
              </div>
-          </div>
+           </div>
        </div>
     </div>
   );

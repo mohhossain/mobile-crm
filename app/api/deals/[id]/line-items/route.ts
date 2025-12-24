@@ -8,9 +8,10 @@ interface LineItem {
   description?: string;
   quantity: number;
   price: number;
+  productId?: string | null;
 }
 
-interface UpdateLineItemsBody {
+interface RequestBody {
   items: LineItem[];
 }
 
@@ -20,16 +21,12 @@ export async function PUT(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // Fix: Await params because it is a Promise in Next.js 15
+  
   const { id } = await params;
+  if (!id) return NextResponse.json({ error: "Missing Deal ID" }, { status: 400 });
 
-  if (!id) {
-    return NextResponse.json({ error: "Missing Deal ID" }, { status: 400 });
-  }
-
-  const body: UpdateLineItemsBody = await request.json();
-  const { items } = body; 
+  const body: RequestBody = await request.json();
+  const { items } = body;
 
   if (!Array.isArray(items)) {
     return NextResponse.json({ error: "Invalid items format" }, { status: 400 });
@@ -41,10 +38,12 @@ export async function PUT(
     }, 0);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        // 1. Wipe existing items (Simple replacement strategy)
         await tx.dealLineItem.deleteMany({
             where: { dealId: id }
         });
 
+        // 2. Re-create items with product links
         if (items.length > 0) {
             await tx.dealLineItem.createMany({
                 data: items.map((item: LineItem) => ({
@@ -52,11 +51,14 @@ export async function PUT(
                     name: item.name,
                     description: item.description || "",
                     quantity: Number(item.quantity),
-                    price: Number(item.price)
+                    price: Number(item.price),
+                    // Ensure product link is preserved
+                    productId: item.productId || null 
                 }))
             });
         }
 
+        // 3. Update Deal Total
         await tx.deal.update({
             where: { id },
             data: { amount: newTotal }

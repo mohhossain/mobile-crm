@@ -33,19 +33,25 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
   const startTab = (initialTab && validTabs.includes(initialTab)) ? initialTab : 'overview';
   const [activeTab, setActiveTab] = useState<any>(startTab);
 
-  // Modal States
   const [showExpense, setShowExpense] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [showPaymentConfig, setShowPaymentConfig] = useState(false); // NEW
+  const [showPaymentConfig, setShowPaymentConfig] = useState(false); 
   const [showContract, setShowContract] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => { setDeal(initialDeal); }, [initialDeal]);
 
+  // ... inside DealDashboard component
+
   const refreshDeal = async () => {
-    router.refresh();
+    // router.refresh(); // Optional: comment this out temporarily to isolate the fetch
     const res = await fetch(`/api/deals/${deal.id}`);
-    if(res.ok) setDeal(await res.json());
+    if(res.ok) {
+        const updatedDeal = await res.json();
+        console.log("[Dashboard] Refreshed Deal Data:", updatedDeal);
+        console.log("[Dashboard] Line Items from Server:", updatedDeal.lineItems);
+        setDeal(updatedDeal);
+    }
   };
 
   const updateDeal = async (updates: any) => {
@@ -59,18 +65,16 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
     } catch (e) { console.error(e); }
   };
 
-  // Smart Share Handler
   const handleSmartShare = async () => {
     if (!deal.shareToken) {
        const newToken = crypto.randomUUID();
        await updateDeal({ shareToken: newToken });
        alert("Link Generated. Click again to share.");
-       return; 
+       return;
     }
 
-    // Check Payment Setup (Include deal-specific overrides in check)
     const hasPayment = 
-        user?.defaultPaymentLink || 
+        user?.defaultPaymentLink ||
         user?.paymentInstructions || 
         (user?.paymentMethods && Object.keys(user.paymentMethods).length > 0) || 
         deal.paymentLink || 
@@ -84,7 +88,7 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
 
     const link = `${window.location.origin}/portal/${deal.shareToken}`;
     const text = `Hi! Here is the proposal for ${deal.title}. Please review and sign here: ${link}`;
-
+    
     if (navigator.share) {
         try { await navigator.share({ title: `Proposal: ${deal.title}`, text: text, url: link }); } 
         catch (e) { console.log("Share cancelled"); }
@@ -131,11 +135,12 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
         {activeTab === 'overview' && (
           <OverviewTab 
             deal={deal}
+            user={user} // <--- THIS WAS THE MISSING LINK
             onUpdate={updateDeal}
             onRefresh={refreshDeal}
             onOpenPayment={() => setShowPayment(true)}
             onOpenExpense={() => setShowExpense(true)}
-            onOpenPaymentConfig={() => setShowPaymentConfig(true)} // NEW
+            onOpenPaymentConfig={() => setShowPaymentConfig(true)}
             onViewContract={() => setShowContract(true)}
             onSendProposal={handleSmartShare}
             onGenerateLink={handleGenerateLink}
@@ -154,7 +159,7 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
          user={user}
          showExpense={showExpense} setShowExpense={setShowExpense}
          showPayment={showPayment} setShowPayment={setShowPayment}
-         showPaymentConfig={showPaymentConfig} setShowPaymentConfig={setShowPaymentConfig} // NEW
+         showPaymentConfig={showPaymentConfig} setShowPaymentConfig={setShowPaymentConfig}
          showContract={showContract} setShowContract={setShowContract}
          showWarning={showWarning} setShowWarning={setShowWarning}
          onRefresh={refreshDeal}
