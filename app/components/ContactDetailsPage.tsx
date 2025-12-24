@@ -37,7 +37,7 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
     ...contact,
     // @ts-ignore - Handle potential schema mismatch between 'company' and 'companyName'
     company: contact.companyName || (contact as any).company || null, 
-    tags: contact.tags.map(t => ({ id: t.id, name: t.name })),
+    tags: contact.tags.map((t: { id: any; name: any; }) => ({ id: t.id, name: t.name })),
     imageUrl: contact.imageUrl ?? null
   };
 
@@ -66,12 +66,12 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
                  <p className="text-gray-400">No active deals.</p>
                </div>
              ) : (
-               contact.deals.map(deal => (
+               contact.deals.map((deal: typeof contact.deals[number]) => (
                  <DealCard 
                    key={deal.id} 
                    deal={{
                      ...deal,
-                     contacts: deal.contacts.map(c => ({
+                     contacts: deal.contacts.map((c: { imageUrl: any; }) => ({
                        ...c,
                        imageUrl: c.imageUrl ?? undefined
                      }))
@@ -96,7 +96,7 @@ export default async function ContactDetailsPage({ params }: { params: Promise<{
                  <p className="text-gray-400">No tasks scheduled.</p>
                </div>
              ) : (
-               contact.tasks.map(task => (
+               contact.tasks.map((task: typeof contact.tasks[number]) => (
                  <TaskCard key={task.id} task={task} />
                ))
              )}
