@@ -4,31 +4,59 @@ import { getCurrentUser } from "@/lib/currentUser";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
   try {
     const body = await req.json();
-    const { dealId, number, issueDate, dueDate, items } = body;
+    const { dealId, issueDate, dueDate, items, status } = body;
 
-    // Calculate total amount from items to ensure backend consistency
-    const amount = items.reduce((sum: number, item: any) => sum + (item.quantity * item.price), 0);
+    const amount = items.reduce((sum: number, item: any) => sum + (Number(item.quantity) * Number(item.price)), 0);
+
+    // FIX: Generate a unique invoice number
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
     const invoice = await prisma.invoice.create({
       data: {
         userId: user.id,
         dealId,
-        number,
+        // FIX: Add the required number field
+        number: invoiceNumber, 
         issueDate: new Date(issueDate),
         dueDate: new Date(dueDate),
         amount,
-        status: 'DRAFT',
-        items: items // Save the snapshot of line items as JSON
+        status: status || "DRAFT",
+        items: items // Assuming items is a JSON field
       }
     });
 
     return NextResponse.json(invoice);
   } catch (error) {
-    console.error("Create Invoice Error:", error);
-    return NextResponse.json({ error: "Failed to create invoice" }, { status: 500 });
+    console.error("[INVOICES_POST]", error);
+    return new NextResponse("Internal Error", { status: 500 });
+  }
+}
+
+export async function GET(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const dealId = searchParams.get("dealId");
+
+  try {
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        userId: user.id,
+        ...(dealId ? { dealId } : {}),
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return NextResponse.json(invoices);
+  } catch (error) {
+    console.error("[INVOICES_GET]", error);
+    return new NextResponse("Internal Error", { status: 500 });
   }
 }
