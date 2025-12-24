@@ -40,7 +40,7 @@ export default async function EditDealPage({ params }: PageProps) {
             ? new Date(deal.closeDate).toISOString().slice(0, 10)
             : ""
         }
-        initialContacts={deal.contacts ? deal.contacts.map((c) => ({ id: c.id, name: c.name || "", email: c.email || "", phone: c.phone || "" })) : []}
+        initialContacts={deal.contacts ? deal.contacts.map((c: { id: any; name: any; email: any; phone: any; }) => ({ id: c.id, name: c.name || "", email: c.email || "", phone: c.phone || "" })) : []}
       />
     </div>
   );
