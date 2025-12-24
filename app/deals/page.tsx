@@ -92,7 +92,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     },
   });
 
-  const deals = dealsRaw.map(deal => ({
+  const deals = dealsRaw.map((deal: { contacts: any[]; }) => ({
     ...deal,
     contacts: deal.contacts.map(contact => ({
       ...contact,
@@ -106,8 +106,8 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
     select: { amount: true, status: true }
   });
 
-  const totalPipeline = allDeals.reduce((sum, d) => d.status !== 'LOST' ? sum + d.amount : sum, 0);
-  const wonCount = allDeals.filter(d => d.status === 'WON').length;
+  const totalPipeline = allDeals.reduce((sum: any, d: { status: string; amount: any; }) => d.status !== 'LOST' ? sum + d.amount : sum, 0);
+  const wonCount = allDeals.filter((d: { status: string; }) => d.status === 'WON').length;
 
   const getTabClass = (tabStatus: string) => {
     const isActive = status === tabStatus;

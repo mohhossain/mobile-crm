@@ -94,8 +94,8 @@ async function getFinanceData(userId: string, period: Period, dateStr?: string) 
   ]);
 
   // 3. Aggregate Totals & Trends
-  const totalRevenue = currDeals.reduce((sum, d) => sum + d.amount, 0);
-  const totalExpenses = currExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalRevenue = currDeals.reduce((sum: any, d: { amount: any; }) => sum + d.amount, 0);
+  const totalExpenses = currExpenses.reduce((sum: any, e: { amount: any; }) => sum + e.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
   const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -137,18 +137,18 @@ async function getFinanceData(userId: string, period: Period, dateStr?: string) 
 
   const chartData = buckets.map(bucketDate => {
     const revenue = currDeals
-      .filter(d => isSame(d.closeDate || d.updatedAt, bucketDate))
-      .reduce((sum, d) => sum + d.amount, 0);
+      .filter((d: { closeDate: any; updatedAt: any; }) => isSame(d.closeDate || d.updatedAt, bucketDate))
+      .reduce((sum: any, d: { amount: any; }) => sum + d.amount, 0);
     const expense = currExpenses
-      .filter(e => isSame(e.date, bucketDate))
-      .reduce((sum, e) => sum + e.amount, 0);
+      .filter((e: { date: Date; }) => isSame(e.date, bucketDate))
+      .reduce((sum: any, e: { amount: any; }) => sum + e.amount, 0);
     return { label: formatLabel(bucketDate), dateStr: bucketDate.toISOString(), revenue, expense };
   });
 
   // 5. Build General Ledger (Unified List)
   const ledger: LedgerItem[] = [
     // Add Invoices (Income)
-    ...currInvoices.map(inv => ({
+    ...currInvoices.map((inv: { id: any; issueDate: any; deal: { contacts: { name: any; }[]; title: any; }; amount: any; status: any; number: any; }) => ({
       id: inv.id,
       date: inv.issueDate,
       type: 'INCOME' as const,
@@ -159,7 +159,7 @@ async function getFinanceData(userId: string, period: Period, dateStr?: string) 
       reference: inv.number
     })),
     // Add Expenses (Expense)
-    ...currExpenses.map(exp => ({
+    ...currExpenses.map((exp: { id: any; date: any; description: any; category: any; amount: any; deal: { title: any; }; }) => ({
       id: exp.id,
       date: exp.date,
       type: 'EXPENSE' as const,

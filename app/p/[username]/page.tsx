@@ -4,6 +4,7 @@ import { GlobeAltIcon, CheckBadgeIcon, ArrowTopRightOnSquareIcon, SparklesIcon }
 import PublicInquiryForm from "@/app/components/PublicInquiryForm";
 import Link from "next/link";
 import { clerkClient } from "@clerk/nextjs/server";
+import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
 
 export const dynamic = 'force-dynamic';
 
@@ -109,7 +110,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {user.products.map((product) => (
+              {user.products.map((product: { id: Key | null | undefined; name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; unitPrice: { toLocaleString: () => string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; description: any; }) => (
                 <div key={product.id} className="group relative bg-base-100 rounded-3xl border border-base-200 hover:border-primary/30 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col">
                   <div className="p-8 flex-1">
                     <div className="flex justify-between items-start mb-4">
@@ -139,8 +140,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                       <h3 className="font-bold text-lg mb-4">Inquire about {product.name}</h3>
                       <PublicInquiryForm 
                         ownerUsername={user.username!} 
-                        serviceId={product.id}
-                        serviceName={product.name}
+                        serviceId={product.id?.toString()}
+                        serviceName={String(product.name)}
                       />
                       <div className="modal-action">
                         <label htmlFor={`inquire-${product.id}`} className="btn btn-ghost btn-sm">Cancel</label>
