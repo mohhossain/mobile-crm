@@ -16,6 +16,7 @@ import {
 import FinancialPulseCard from "./components/FinancialPulseCard";
 import HomeActions from "./components/HomeActions";
 import LandingPage from "./components/LandingPage";
+import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
 
 // --- TYPES ---
 type AlertType = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
@@ -70,21 +71,21 @@ async function getSmartDashboardData(userId: string) {
   // --- METRIC CALCULATIONS ---
 
   // 1. Cash & Revenue
-  const wonDeals = deals.filter(d => d.status === 'WON');
-  const revenueYTD = wonDeals.reduce((sum, d) => sum + d.amount, 0);
+  const wonDeals = deals.filter((d: { status: string; }) => d.status === 'WON');
+  const revenueYTD = wonDeals.reduce((sum: any, d: { amount: any; }) => sum + d.amount, 0);
   const totalExpenses = expenses._sum.amount || 0;
   
   // 2. "The Chase List" (Money Owed)
-  const pendingInvoices = invoices.filter(i => i.status === 'SENT' || i.status === 'OVERDUE');
-  const pendingCash = pendingInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const pendingInvoices = invoices.filter((i: { status: string; }) => i.status === 'SENT' || i.status === 'OVERDUE');
+  const pendingCash = pendingInvoices.reduce((sum: any, i: { amount: any; }) => sum + i.amount, 0);
   
   // 3. Pipeline Health
-  const activeDeals = deals.filter(d => !['WON', 'LOST', 'CANCELLED'].includes(d.status));
-  const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
-  const weightedPipeline = activeDeals.reduce((sum, d) => sum + (d.amount * (d.probability / 100)), 0);
+  const activeDeals = deals.filter((d: { status: string; }) => !['WON', 'LOST', 'CANCELLED'].includes(d.status));
+  const pipelineValue = activeDeals.reduce((sum: any, d: { amount: any; }) => sum + d.amount, 0);
+  const weightedPipeline = activeDeals.reduce((sum: number, d: { amount: number; probability: number; }) => sum + (d.amount * (d.probability / 100)), 0);
 
   // 4. Stale Deals (No update in 7 days)
-  const staleDeals = activeDeals.filter(d => new Date(d.updatedAt) < sevenDaysAgo);
+  const staleDeals = activeDeals.filter((d: { updatedAt: string | number | Date; }) => new Date(d.updatedAt) < sevenDaysAgo);
 
   return {
     metrics: {
@@ -219,7 +220,7 @@ export default async function Home() {
                       <div className="text-xs text-warning font-bold uppercase tracking-wider">
                         Needs Attention ({lists.staleDeals.length})
                       </div>
-                      {lists.staleDeals.slice(0, 3).map(deal => (
+                      {lists.staleDeals.slice(0, 3).map((deal: { id: Key | null | undefined; title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; status: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; amount: { toLocaleString: () => string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; }) => (
                         <Link href={`/deals/${deal.id}`} key={deal.id} className="flex justify-between items-center p-3 bg-base-200/50 hover:bg-base-200 rounded-lg transition-colors group">
                            <div>
                              <div className="font-bold text-sm">{deal.title}</div>
@@ -259,7 +260,7 @@ export default async function Home() {
                       <p className="text-xs text-base-content/40 italic">All invoices paid.</p>
                     ) : (
                       <div className="space-y-1">
-                        {lists.pendingInvoices.slice(0, 3).map(inv => (
+                        {lists.pendingInvoices.slice(0, 3).map((inv: { id: Key | null | undefined; deal: { title: any; }; number: any; amount: { toLocaleString: () => string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; }) => (
                           <Link href={`/deals/${(inv as any).dealId || ''}?tab=invoices`} key={inv.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-base-200 transition text-xs">
                              <div className="flex items-center gap-2">
                                 <DocumentTextIcon className="w-3 h-3 text-warning" />
@@ -281,7 +282,7 @@ export default async function Home() {
                       <p className="text-xs text-base-content/40 italic">No urgent tasks.</p>
                     ) : (
                       <div className="space-y-1">
-                        {lists.urgentTasks.map(task => (
+                        {lists.urgentTasks.map((task: { id: Key | null | undefined; title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; deal: { title: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; dueDate: string | number | Date; }) => (
                           <Link href={`/tasks`} key={task.id} className="flex items-start gap-2 p-2 hover:bg-base-200 rounded-lg transition text-xs group cursor-pointer">
                              <div className="mt-1 w-1.5 h-1.5 rounded-full bg-error shrink-0"></div>
                              <div className="flex-1 min-w-0">
@@ -303,7 +304,7 @@ export default async function Home() {
            <div className="bg-base-100 rounded-xl border border-base-200 p-4">
               <h4 className="text-xs font-bold uppercase opacity-40 mb-3">Recent Activity</h4>
               <div className="space-y-1">
-                 {lists.recentActivity.map(note => {
+                 {lists.recentActivity.map((note: { deal: { id: any; title: string; }; contact: { id: any; name: string; }; id: Key | null | undefined; content: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; createdAt: string | number | Date; }) => {
                    // Link Logic
                    let href = "#";
                    let context = "";
