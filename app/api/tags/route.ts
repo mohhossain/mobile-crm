@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       where: { name: { in: sanitizedTags } },
     });
 
-    const existingTagNames = existingTags.map(tag => tag.name);
+    const existingTagNames = existingTags.map((tag: { name: any; }) => tag.name);
     const newTagNames = sanitizedTags.filter(tag => !existingTagNames.includes(tag));
 
     if (newTagNames.length > 0) {
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       where: { id: dealId },
       data: {
         tags: {
-          connect: allTags.map(tag => ({ id: tag.id })),
+          connect: allTags.map((tag: { id: any; }) => ({ id: tag.id })),
         },
       },
     });
