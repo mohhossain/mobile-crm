@@ -18,7 +18,8 @@ export async function GET() {
     });
 
     // Flatten structure for frontend
-    const formattedContacts = contacts.map(c => ({
+    // FIX: Added '(c: any)' to resolve the implicit any error
+    const formattedContacts = contacts.map((c: any) => ({
       ...c,
       company: c.company?.name || c.companyName || null,
     }));
