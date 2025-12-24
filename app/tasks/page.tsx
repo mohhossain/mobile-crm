@@ -64,6 +64,8 @@ export default async function TasksPage({
     },
   });
 
+  type TaskWithDeal = typeof tasks[number];
+
   return (
     <div className="p-4 pb-24 max-w-3xl mx-auto space-y-6">
        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -101,7 +103,7 @@ export default async function TasksPage({
            </div>
          )}
          
-         {tasks.map(task => (
+         {tasks.map((task: TaskWithDeal) => (
            <TaskCard key={task.id} task={task} />
          ))}
        </div>
