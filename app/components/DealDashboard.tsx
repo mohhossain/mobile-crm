@@ -90,29 +90,56 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
     const message = `Hi! Here is the proposal for ${deal.title}. Please review and sign here: ${link}`;
 
     // 4. Trigger Native Share (Mobile) or Clipboard (Desktop)
+// --- UPDATED SHARE LOGIC ---
+  const handleSmartShare = async () => {
+    // 1. Generate Token if missing
+    let currentToken = deal.shareToken;
+    if (!currentToken) {
+       const newToken = crypto.randomUUID();
+       await updateDeal({ shareToken: newToken });
+       currentToken = newToken;
+    }
+
+    // 2. Check for Payment/Terms Readiness
+    const hasPayment = 
+        user?.defaultPaymentLink ||
+        user?.paymentInstructions || 
+        (user?.paymentMethods && Object.keys(user.paymentMethods).length > 0) || 
+        deal.paymentLink || 
+        deal.paymentInstructions ||
+        (deal.paymentMethods && Object.keys(deal.paymentMethods).length > 0);
+
+    if (!hasPayment) {
+       setShowWarning(true);
+       return;
+    }
+
+    // 3. Construct the Message
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const link = `${baseUrl}/portal/${currentToken}`;
+    const message = `Hi! Here is the proposal for ${deal.title}. Please review and sign here: ${link}`;
+
+    // 4. Force Share (Skip checks, just try)
     try {
-        const canShare = await Share.canShare();
-        if (canShare.value) {
-            await Share.share({
-                title: `Proposal: ${deal.title}`,
-                text: message,
-                url: link,
-                dialogTitle: 'Send Proposal via...'
-            });
-        } else {
-            throw new Error("Native share not supported");
-        }
+        await Share.share({
+            title: `Proposal: ${deal.title}`,
+            text: message,
+            url: link,
+            dialogTitle: 'Send Proposal'
+        });
     } catch (e) {
-        // Fallback: Copy to Clipboard
+        console.warn("Share failed, falling back to clipboard", e);
+        
+        // 5. Fallback: Copy to Clipboard
         if (navigator.clipboard && window.isSecureContext) {
              navigator.clipboard.writeText(link)
-                .then(() => alert("Link copied to clipboard! You can now paste it into any message."))
+                .then(() => alert("Link copied! You can paste it in a message."))
                 .catch(() => prompt("Copy this link:", link));
         } else {
              prompt("Copy this link:", link);
         }
     }
-  };
+  }
 
   const handleGenerateLink = async () => {
       const newToken = crypto.randomUUID();
@@ -181,4 +208,4 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
 
     </div>
   );
-}
+}}
