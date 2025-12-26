@@ -31,18 +31,15 @@ export default function TaskCard({ task }: TaskProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Edit States
   const [title, setTitle] = useState(task.title);
   const [desc, setDesc] = useState(task.description || "");
   const [priority, setPriority] = useState(task.priority);
   
-  // Parse Dates safely for inputs
   const initialDate = task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "";
   const initialTime = task.dueDate ? new Date(task.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : "";
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
 
-  // Toggle Done/ToDo
   const toggleStatus = async () => {
     setLoading(true);
     const newStatus = task.status === 'DONE' ? 'TO_DO' : 'DONE';
@@ -56,7 +53,6 @@ export default function TaskCard({ task }: TaskProps) {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  // Save Edits
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -69,18 +65,10 @@ export default function TaskCard({ task }: TaskProps) {
       const res = await fetch(`/api/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description: desc,
-          priority,
-          dueDate: finalDate
-        })
+        body: JSON.stringify({ title, description: desc, priority, dueDate: finalDate })
       });
 
-      if (res.ok) {
-        setIsEditing(false);
-        router.refresh();
-      }
+      if (res.ok) { setIsEditing(false); router.refresh(); }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -101,7 +89,6 @@ export default function TaskCard({ task }: TaskProps) {
       ${task.priority === 3 && task.status !== 'DONE' ? 'border-l-4 border-l-error' : ''}
     `}>
       
-      {/* 1. VIEW MODE */}
       {!isEditing ? (
         <div className="flex items-start gap-4">
           <button 
@@ -118,12 +105,12 @@ export default function TaskCard({ task }: TaskProps) {
                 {task.title}
               </h3>
               
-              {/* Quick Actions (Visible on Hover) */}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => setIsEditing(true)} className="btn btn-square btn-xs btn-ghost text-base-content/50" title="Edit">
+              {/* ACTION BUTTONS: Always visible on mobile (opacity-100), Hover on desktop */}
+              <div className="flex gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                <button onClick={() => setIsEditing(true)} className="btn btn-square btn-xs btn-ghost text-base-content/50 bg-base-200 lg:bg-transparent">
                   <PencilIcon className="w-3 h-3" />
                 </button>
-                <button onClick={handleDelete} className="btn btn-square btn-xs btn-ghost text-error" title="Delete">
+                <button onClick={handleDelete} className="btn btn-square btn-xs btn-ghost text-error bg-base-200 lg:bg-transparent">
                   <TrashIcon className="w-3 h-3" />
                 </button>
               </div>
@@ -132,24 +119,18 @@ export default function TaskCard({ task }: TaskProps) {
             {task.description && <p className="text-xs text-base-content/60 mt-1 line-clamp-1">{task.description}</p>}
 
             <div className="flex flex-wrap gap-2 mt-2 items-center">
-              {/* Date Chip */}
               {task.dueDate && (
                 <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md ${isOverdue ? 'bg-error/10 text-error' : 'bg-base-200 text-base-content/60'}`}>
                   <CalendarIcon className="w-3 h-3" />
                   {new Date(task.dueDate).toLocaleDateString()} 
-                  {time && <span className="opacity-60 ml-1">{new Date(task.dueDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>}
                 </div>
               )}
-
-              {/* Deal Chip */}
               {task.deal && (
                 <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-md bg-secondary/10 text-secondary">
                   <BriefcaseIcon className="w-3 h-3" />
                   {task.deal.title}
                 </div>
               )}
-
-              {/* Priority Flag */}
               {task.priority === 3 && (
                 <div className="flex items-center gap-1 text-[10px] font-bold text-error">
                   <FlagIcon className="w-3 h-3" /> High
@@ -159,58 +140,20 @@ export default function TaskCard({ task }: TaskProps) {
           </div>
         </div>
       ) : (
-        
-        /* 2. EDIT MODE (In-Place) */
+        /* Edit Mode */
         <div className="space-y-3 animate-in fade-in">
-          <input 
-            className="input input-sm input-bordered w-full font-bold" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)} 
-            placeholder="Task Title"
-            autoFocus
-          />
-          <textarea 
-            className="textarea textarea-sm textarea-bordered w-full"
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-            placeholder="Description..."
-            rows={2}
-          />
+          <input className="input input-sm input-bordered w-full font-bold" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <textarea className="textarea textarea-sm textarea-bordered w-full" value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
           
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="join bg-base-100 border border-base-300 rounded-lg p-0.5">
-               <input 
-                 type="date" 
-                 className="input input-xs input-ghost join-item" 
-                 value={date} 
-                 onChange={(e) => setDate(e.target.value)} 
-               />
-               <input 
-                 type="time" 
-                 className="input input-xs input-ghost join-item" 
-                 value={time} 
-                 onChange={(e) => setTime(e.target.value)} 
-               />
-            </div>
-
-            <select 
-              className="select select-xs select-bordered" 
-              value={priority}
-              onChange={(e) => setPriority(parseInt(e.target.value))}
-            >
-              <option value={1}>Low Priority</option>
-              <option value={2}>Medium Priority</option>
-              <option value={3}>High Priority</option>
+            <input type="date" className="input input-xs input-bordered" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input type="time" className="input input-xs input-bordered" value={time} onChange={(e) => setTime(e.target.value)} />
+            <select className="select select-xs select-bordered" value={priority} onChange={(e) => setPriority(parseInt(e.target.value))}>
+              <option value={1}>Low</option><option value={2}>Medium</option><option value={3}>High</option>
             </select>
-
             <div className="flex-1"></div>
-            
-            <button onClick={() => setIsEditing(false)} className="btn btn-xs btn-ghost text-base-content/50">
-              Cancel
-            </button>
-            <button onClick={handleSave} disabled={loading} className="btn btn-xs btn-primary gap-1">
-              <CheckIcon className="w-3 h-3" /> Save
-            </button>
+            <button onClick={() => setIsEditing(false)} className="btn btn-xs btn-ghost">Cancel</button>
+            <button onClick={handleSave} disabled={loading} className="btn btn-xs btn-primary">Save</button>
           </div>
         </div>
       )}
