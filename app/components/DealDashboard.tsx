@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Share } from '@capacitor/share'; // <--- IMPORT THIS
 import { 
   UserGroupIcon,
   ClipboardDocumentCheckIcon,
@@ -41,17 +42,10 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
 
   useEffect(() => { setDeal(initialDeal); }, [initialDeal]);
 
-  // ... inside DealDashboard component
-
   const refreshDeal = async () => {
-    // router.refresh(); // Optional: comment this out temporarily to isolate the fetch
+    router.refresh();
     const res = await fetch(`/api/deals/${deal.id}`);
-    if(res.ok) {
-        const updatedDeal = await res.json();
-        console.log("[Dashboard] Refreshed Deal Data:", updatedDeal);
-        console.log("[Dashboard] Line Items from Server:", updatedDeal.lineItems);
-        setDeal(updatedDeal);
-    }
+    if(res.ok) setDeal(await res.json());
   };
 
   const updateDeal = async (updates: any) => {
@@ -65,14 +59,17 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
     } catch (e) { console.error(e); }
   };
 
+  // --- UPDATED SHARE LOGIC ---
   const handleSmartShare = async () => {
-    if (!deal.shareToken) {
+    // 1. Generate Token if missing
+    let currentToken = deal.shareToken;
+    if (!currentToken) {
        const newToken = crypto.randomUUID();
        await updateDeal({ shareToken: newToken });
-       alert("Link Generated. Click again to share.");
-       return;
+       currentToken = newToken;
     }
 
+    // 2. Check for Payment/Terms Readiness
     const hasPayment = 
         user?.defaultPaymentLink ||
         user?.paymentInstructions || 
@@ -86,17 +83,33 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
        return;
     }
 
-    const link = `${window.location.origin}/portal/${deal.shareToken}`;
-    const text = `Hi! Here is the proposal for ${deal.title}. Please review and sign here: ${link}`;
-    
-    if (navigator.share) {
-        try { await navigator.share({ title: `Proposal: ${deal.title}`, text: text, url: link }); } 
-        catch (e) { console.log("Share cancelled"); }
-    } else {
-        if (navigator.clipboard && window.isSecureContext) {
-             navigator.clipboard.writeText(link).then(() => alert("Copied!")).catch(() => prompt("Copy:", link));
+    // 3. Construct the Message
+    // IMPORTANT: Use the ENV variable for the domain, fallback to window.location only for dev
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const link = `${baseUrl}/portal/${currentToken}`;
+    const message = `Hi! Here is the proposal for ${deal.title}. Please review and sign here: ${link}`;
+
+    // 4. Trigger Native Share (Mobile) or Clipboard (Desktop)
+    try {
+        const canShare = await Share.canShare();
+        if (canShare.value) {
+            await Share.share({
+                title: `Proposal: ${deal.title}`,
+                text: message,
+                url: link,
+                dialogTitle: 'Send Proposal via...'
+            });
         } else {
-             prompt("Copy:", link);
+            throw new Error("Native share not supported");
+        }
+    } catch (e) {
+        // Fallback: Copy to Clipboard
+        if (navigator.clipboard && window.isSecureContext) {
+             navigator.clipboard.writeText(link)
+                .then(() => alert("Link copied to clipboard! You can now paste it into any message."))
+                .catch(() => prompt("Copy this link:", link));
+        } else {
+             prompt("Copy this link:", link);
         }
     }
   };
@@ -104,7 +117,7 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
   const handleGenerateLink = async () => {
       const newToken = crypto.randomUUID();
       await updateDeal({ shareToken: newToken });
-      setTimeout(() => alert("Link Generated"), 500);
+      setTimeout(() => alert("New Magic Link Generated"), 500);
   };
 
   return (
@@ -135,7 +148,7 @@ export default function DealDashboard({ deal: initialDeal, initialTab, user }: D
         {activeTab === 'overview' && (
           <OverviewTab 
             deal={deal}
-            user={user} // <--- THIS WAS THE MISSING LINK
+            user={user}
             onUpdate={updateDeal}
             onRefresh={refreshDeal}
             onOpenPayment={() => setShowPayment(true)}
