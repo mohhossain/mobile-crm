@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   images: {
     unoptimized: true, // <--- ADD THIS. Critical for Capacitor/Mobile.
-    domains: ['res.cloudinary.com'],
+    remotePatterns: [{ hostname: 'res.cloudinary.com' }],
   },
 };
 
