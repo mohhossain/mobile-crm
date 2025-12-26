@@ -17,6 +17,7 @@ import FinancialPulseCard from "./components/FinancialPulseCard";
 import HomeActions from "./components/HomeActions";
 import LandingPage from "./components/LandingPage";
 import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
+import DashboardWrapper from "./components/DashboardWrapper";
 
 // --- TYPES ---
 type AlertType = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS';
@@ -120,6 +121,7 @@ export default async function Home() {
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   return (
+    <DashboardWrapper>
     <div className="space-y-8 pb-32">
       
       {/* 1. HEADER */}
@@ -341,5 +343,6 @@ export default async function Home() {
         </div>
       </div>
     </div>
+    </DashboardWrapper>
   );
 }
